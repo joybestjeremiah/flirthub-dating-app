@@ -44,6 +44,10 @@ export interface Call {
   status: string;
   started_at: string;
   ended_at: string | null;
+  offer?: RTCSessionDescriptionInit | null;
+  answer?: RTCSessionDescriptionInit | null;
+  caller_ice?: RTCIceCandidateInit[];
+  callee_ice?: RTCIceCandidateInit[];
 }
 
 export interface Room {
