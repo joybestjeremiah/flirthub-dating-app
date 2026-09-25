@@ -94,7 +94,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
           filter: `call_id=eq.${call.id}`,
         }, async payload => {
           const row = payload.new as { user_id: string; candidate: RTCIceCandidateInit };
-          if (row.user_id === call.caller) return;
+          if ((role === 'caller' && row.user_id === call.caller) || (role === 'callee' && row.user_id !== call.caller)) return;
           const candidate = row.candidate;
           const key = candidate.candidate || JSON.stringify(candidate);
           if (appliedCandidates.current.has(key)) return;
@@ -160,7 +160,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
 
         if (existingCandidates) {
           for (const row of existingCandidates as { user_id: string; candidate: RTCIceCandidateInit }[]) {
-            if (row.user_id === call.caller) continue;
+            if ((role === 'caller' && row.user_id === call.caller) || (role === 'callee' && row.user_id !== call.caller)) continue;
             const key = row.candidate.candidate || JSON.stringify(row.candidate);
             if (appliedCandidates.current.has(key)) continue;
             if (!connection.remoteDescription) {
