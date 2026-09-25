@@ -52,6 +52,8 @@ export default function AdminPanel({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAll();
@@ -156,28 +158,59 @@ export default function AdminPanel({ onBack }: Props) {
 
   const handleDeleteRoom = async (roomId: string) => {
     if (!confirm('Delete this room? This cannot be undone.')) return;
-    await supabase.from('rooms').delete().eq('id', roomId);
+    setActionBusy(true);
+    setActionError(null);
+    const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+    setActionBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
     setRooms((prev) => prev.filter((r) => r.id !== roomId));
     loadStats();
   };
 
   const handleRevokeSubscription = async (subId: string) => {
     if (!confirm('Revoke this subscription?')) return;
-    await supabase.from('subscriptions').delete().eq('id', subId);
+    setActionBusy(true);
+    setActionError(null);
+    const { error } = await supabase.from('subscriptions').delete().eq('id', subId);
+    setActionBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
     await loadSubscriptions();
     await loadStats();
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Delete this user profile? Their auth account will remain but all profile data will be removed.')) return;
-    await supabase.from('profiles').delete().eq('id', userId);
+    setActionBusy(true);
+    setActionError(null);
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    setActionBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     setSelectedUser(null);
     loadStats();
   };
 
   const handleToggleAdmin = async (user: AdminUser) => {
-    await supabase.from('profiles').update({ is_admin: !user.is_admin }).eq('id', user.id);
+    setActionBusy(true);
+    setActionError(null);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_admin: !user.is_admin })
+      .eq('id', user.id);
+    setActionBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
     await loadUsers();
     setSelectedUser(null);
   };
@@ -242,6 +275,14 @@ export default function AdminPanel({ onBack }: Props) {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
+        {actionError && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>{actionError}</span>
+            <button onClick={() => setActionError(null)} className="text-red-500 hover:text-red-700" aria-label="Dismiss error">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         {/* Overview */}
         {tab === 'overview' && stats && (
           <div>
@@ -436,7 +477,8 @@ export default function AdminPanel({ onBack }: Props) {
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handleRevokeSubscription(s.id)}
-                            className="text-sm text-red-500 font-medium hover:text-red-600"
+                            disabled={actionBusy}
+                            className="text-sm text-red-500 font-medium hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Revoke
                           </button>
@@ -487,7 +529,8 @@ export default function AdminPanel({ onBack }: Props) {
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => handleDeleteRoom(r.id)}
-                          className="text-sm text-red-500 font-medium hover:text-red-600 inline-flex items-center gap-1"
+                          disabled={actionBusy}
+                          className="text-sm text-red-500 font-medium hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
                         >
                           <Trash2 className="w-4 h-4" />
                           Delete
@@ -554,13 +597,15 @@ export default function AdminPanel({ onBack }: Props) {
             <div className="space-y-2">
               <button
                 onClick={() => handleToggleAdmin(selectedUser)}
-                className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-700 font-medium text-sm hover:bg-gray-200 transition-colors"
+                disabled={actionBusy}
+                className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-700 font-medium text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {selectedUser.is_admin ? 'Remove Admin' : 'Make Admin'}
               </button>
               <button
                 onClick={() => handleDeleteUser(selectedUser.id)}
-                className="w-full py-2.5 rounded-xl bg-red-50 text-red-600 font-medium text-sm hover:bg-red-100 transition-colors"
+                disabled={actionBusy}
+                className="w-full py-2.5 rounded-xl bg-red-50 text-red-600 font-medium text-sm hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete User Profile
               </button>
