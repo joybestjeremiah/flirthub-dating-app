@@ -22,6 +22,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   const [muted, setMuted] = useState(false);
   const [camera, setCamera] = useState(call.call_type === 'video');
   const [error, setError] = useState<string | null>(null);
+  const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const appliedCandidates = useRef(new Set<string>());
 
@@ -48,8 +49,11 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
         stream.getTracks().forEach(track => connection.addTrack(track, stream));
 
         connection.onconnectionstatechange = () => {
+          setConnectionState(connection.connectionState);
           if (connection.connectionState === 'failed' || connection.connectionState === 'disconnected') {
             setError('The call connection was lost. Please try again.');
+          } else if (connection.connectionState === 'connected') {
+            setError(null);
           }
         };
 
@@ -181,6 +185,11 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   return (
     <div className="fixed inset-0 z-[70] bg-gray-950 flex flex-col">
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+        {connectionState !== 'connected' && !error && (
+          <div className="absolute top-5 left-5 right-5 z-10 rounded-xl bg-black/50 px-4 py-2 text-center text-white text-sm backdrop-blur">
+            {connectionState === 'connecting' ? 'Connecting call…' : 'Setting up call…'}
+          </div>
+        )}
         <video ref={remoteVideo} autoPlay playsInline className="w-full h-full object-cover bg-gray-900" />
         {call.call_type === 'video' ? (
           <video ref={localVideo} autoPlay muted playsInline className="absolute top-5 right-5 w-28 h-40 rounded-2xl object-cover border border-white/20 bg-gray-800" />
