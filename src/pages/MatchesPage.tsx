@@ -40,6 +40,15 @@ export default function MatchesPage({ onBack }: Props) {
             : m
         ));
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+        const updated = payload.new as Message;
+        if (updated.sender !== user.id || !updated.read) return;
+        setMatches((prev) => prev.map((m) =>
+          m.id === updated.match_id && m.lastMessage?.id === updated.id
+            ? { ...m, lastMessage: updated }
+            : m
+        ));
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, activeMatch?.id]);
@@ -254,6 +263,16 @@ function ChatView({
             prev.some((message) => message.id === incoming.id)
               ? prev
               : [...prev, incoming]
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `match_id=eq.${match.id}` },
+        (payload) => {
+          const updated = payload.new as Message;
+          setMessages((prev) =>
+            prev.map((message) => (message.id === updated.id ? updated : message))
           );
         }
       )
