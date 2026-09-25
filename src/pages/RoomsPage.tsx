@@ -12,6 +12,7 @@ interface Props {
 export default function RoomsPage({ onBack }: Props) {
   const { user, hasActiveSubscription } = useAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
@@ -53,6 +54,22 @@ export default function RoomsPage({ onBack }: Props) {
 
     const unique = Array.from(new Map(allRooms.map((r) => [r.id, r])).values());
     setRooms(unique);
+    if (unique.length > 0) {
+      const { data: members } = await supabase
+        .from('room_members')
+        .select('room_id')
+        .in('room_id', unique.map((r) => r.id));
+      const counts: Record<string, number> = {};
+      (members || []).forEach((m: { room_id: string }) => {
+        counts[m.room_id] = (counts[m.room_id] || 0) + 1;
+      });
+      unique.forEach((room) => {
+        if (room.owner) counts[room.id] = (counts[room.id] || 0) + 1;
+      });
+      setMemberCounts(counts);
+    } else {
+      setMemberCounts({});
+    }
     setLoading(false);
   };
 
@@ -192,7 +209,7 @@ export default function RoomsPage({ onBack }: Props) {
                     <div className="text-sm text-gray-500 truncate">{room.description}</div>
                   )}
                   <div className="text-xs text-gray-400 mt-0.5">
-                    {room.owner === user?.id ? 'Owner' : 'Member'}
+                    {room.owner === user?.id ? 'Owner' : 'Member'} · {memberCounts[room.id] || 1} {(memberCounts[room.id] || 1) === 1 ? 'member' : 'members'}
                   </div>
                 </div>
                 {!hasActiveSubscription && <Lock className="w-5 h-5 text-rose-400" />}
