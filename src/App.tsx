@@ -8,6 +8,7 @@ import MatchesPage from '@/pages/MatchesPage';
 import RoomsPage from '@/pages/RoomsPage';
 import AdminPanel from '@/pages/AdminPanel';
 import SubscriptionModal from '@/components/SubscriptionModal';
+import IncomingCall from '@/components/IncomingCall';
 
 type Route = '/' | '/profile-setup' | '/discover' | '/matches' | '/rooms' | '/admin';
 
@@ -151,6 +152,7 @@ function App() {
       </nav>
 
       {showSubModal && <SubscriptionModal onClose={() => setShowSubModal(false)} />}
+      <IncomingCall userId={user.id} />
     </div>
   );
 }
