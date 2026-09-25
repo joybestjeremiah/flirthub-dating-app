@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck, Gift } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Message, Match } from '@/lib/types';
 import SubscriptionModal from '@/components/SubscriptionModal';
 import CallModal from '@/components/CallModal';
+import GiftSubscriptionModal from '@/components/GiftSubscriptionModal';
 
 interface MatchWithProfile extends Match {
   otherProfile: Profile;
@@ -25,6 +26,7 @@ export default function MatchesPage({ onBack }: Props) {
   const [showSubModal, setShowSubModal] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
+  const [showGiftModal, setShowGiftModal] = useState(false);
 
   useEffect(() => {
     loadMatches();
@@ -164,7 +166,16 @@ export default function MatchesPage({ onBack }: Props) {
             loadMatches();
           }}
           onCall={handleCallClick}
+          onGift={() => setShowGiftModal(true)}
         />
+        {showGiftModal && activeMatch && (
+          <GiftSubscriptionModal
+            recipientId={activeMatch.otherProfile.id}
+            recipientName={activeMatch.otherProfile.display_name}
+            onClose={() => setShowGiftModal(false)}
+            onSuccess={() => setShowGiftModal(false)}
+          />
+        )}
         {showCallModal && activeMatch && (
           <CallModal
             match={activeMatch}
@@ -239,10 +250,12 @@ function ChatView({
   match,
   onBack,
   onCall,
+  onGift,
 }: {
   match: MatchWithProfile;
   onBack: () => void;
   onCall: (type: 'audio' | 'video') => void;
+  onGift: () => void;
 }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -368,6 +381,9 @@ function ChatView({
         </button>
         <button onClick={() => onCall('video')} className="p-2 text-gray-500 hover:text-rose-500 transition-colors">
           <Video className="w-5 h-5" />
+        </button>
+        <button onClick={onGift} className="p-2 text-gray-500 hover:text-rose-500 transition-colors" title="Gift subscription">
+          <Gift className="w-5 h-5" />
         </button>
       </div>
 
