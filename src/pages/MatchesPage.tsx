@@ -19,6 +19,7 @@ export default function MatchesPage({ onBack }: Props) {
   const { user, hasActiveSubscription } = useAuth();
   const [matches, setMatches] = useState<MatchWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeMatch, setActiveMatch] = useState<MatchWithProfile | null>(null);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
@@ -31,12 +32,21 @@ export default function MatchesPage({ onBack }: Props) {
   const loadMatches = async () => {
     if (!user) return;
     setLoading(true);
+    setError(null);
 
-    const { data: matchData } = await supabase
+    const { data: matchData, error: matchError } = await supabase
       .from('matches')
       .select('*')
       .or(`user1.eq.${user.id},user2.eq.${user.id}`)
       .order('created_at', { ascending: false });
+
+    if (matchError) {
+      console.error('Failed to load matches', matchError);
+      setError('We could not load your matches. Please try again.');
+      setMatches([]);
+      setLoading(false);
+      return;
+    }
 
     if (!matchData) {
       setLoading(false);
@@ -232,12 +242,17 @@ function ChatView({
   }, [messages]);
 
   const loadMessages = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('messages')
       .select('*')
       .eq('match_id', match.id)
       .order('created_at', { ascending: true });
-    setMessages((data || []) as Message[]);
+    if (error) {
+      console.error('Failed to load messages', error);
+      setMessages([]);
+    } else {
+      setMessages((data || []) as Message[]);
+    }
     setLoading(false);
   };
 
@@ -247,7 +262,7 @@ function ChatView({
     const content = input.trim();
     setInput('');
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('messages')
       .insert({
         match_id: match.id,
@@ -256,6 +271,12 @@ function ChatView({
       })
       .select('*')
       .single();
+
+    if (error) {
+      console.error('Failed to send message', error);
+      setInput(content);
+      return;
+    }
 
     if (data) {
       const sent = data as Message;
