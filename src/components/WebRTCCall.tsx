@@ -217,6 +217,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
       }
       pc.current?.close();
       pc.current = null;
+      void supabase.rpc('cleanup_call_ice_candidates', { p_call_id: call.id });
     };
   }, [call.id, call.call_type, call.caller, role, onClose]);
 
@@ -231,6 +232,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
       status: 'ended',
       ended_at: new Date().toISOString(),
     }).eq('id', call.id);
+    await supabase.rpc('cleanup_call_ice_candidates', { p_call_id: call.id });
     onClose();
   };
 
