@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Phone, Video, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Call, Profile } from '@/lib/types';
+import WebRTCCall from '@/components/WebRTCCall';
 
 interface Props {
   userId: string;
@@ -10,6 +11,7 @@ interface Props {
 export default function IncomingCall({ userId }: Props) {
   const [call, setCall] = useState<Call | null>(null);
   const [caller, setCaller] = useState<Profile | null>(null);
+  const [active, setActive] = useState(false);
 
   useEffect(() => {
     const channel = supabase
@@ -40,6 +42,8 @@ export default function IncomingCall({ userId }: Props) {
 
     return () => { supabase.removeChannel(channel); };
   }, [userId]);
+
+  if (active && call) return <WebRTCCall call={call} role="callee" otherProfile={caller} onClose={() => { setActive(false); setCall(null); }} />;
 
   if (!call) return null;
 
@@ -82,7 +86,7 @@ export default function IncomingCall({ userId }: Props) {
           <button onClick={() => updateCall('rejected')} className="w-14 h-14 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center">
             <X className="w-6 h-6" />
           </button>
-          <button onClick={() => updateCall('accepted')} className="w-14 h-14 rounded-full bg-green-500 text-white flex items-center justify-center">
+          <button onClick={async () => { await updateCall('accepted'); setActive(true); }} className="w-14 h-14 rounded-full bg-green-500 text-white flex items-center justify-center">
             <Phone className="w-6 h-6" />
           </button>
         </div>
