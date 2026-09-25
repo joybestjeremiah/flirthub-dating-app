@@ -19,20 +19,29 @@ export default function CallModal({ match, callType, onClose }: Props) {
   const [status, setStatus] = useState<'calling' | 'connected' | 'ended'>('calling');
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [callId, setCallId] = useState<string | null>(null);
 
   useEffect(() => {
     const startCall = async () => {
       if (!user) return;
-      await supabase.from('calls').insert({
+      const { data, error } = await supabase.from('calls').insert({
         match_id: match.id,
         caller: user.id,
         call_type: callType,
         status: 'initiated',
-      });
-      setTimeout(() => setStatus('connected'), 2500);
+      }).select('id').single();
+
+      if (error || !data) {
+        console.error('Failed to start call', error);
+        setStatus('ended');
+        setTimeout(onClose, 1000);
+        return;
+      }
+
+      setCallId(data.id);
     };
     startCall();
-  }, []);
+  }, [user, match.id, callType, onClose]);
 
   useEffect(() => {
     if (status !== 'connected') return;
@@ -40,7 +49,14 @@ export default function CallModal({ match, callType, onClose }: Props) {
     return () => clearInterval(interval);
   }, [status]);
 
-  const handleEnd = () => {
+  const handleEnd = async () => {
+    if (callId) {
+      const { error } = await supabase
+        .from('calls')
+        .update({ status: 'ended', ended_at: new Date().toISOString() })
+        .eq('id', callId);
+      if (error) console.error('Failed to end call', error);
+    }
     setStatus('ended');
     setTimeout(onClose, 1000);
   };
@@ -61,7 +77,7 @@ export default function CallModal({ match, callType, onClose }: Props) {
         </div>
         <div className="text-white text-xl font-semibold mt-2">{other?.display_name}</div>
         <div className="text-white/50 text-sm mt-1">
-          {status === 'calling' && 'Calling...'}
+          {status === 'calling' && 'Call request sent...'}
           {status === 'connected' && formatTime(duration)}
           {status === 'ended' && 'Call ended'}
         </div>
@@ -82,6 +98,11 @@ export default function CallModal({ match, callType, onClose }: Props) {
           )}
         </div>
         {status === 'calling' && (
+          <div className="mt-6 text-center text-white/60 text-sm">
+            Waiting for the other person to respond
+          </div>
+        )}
+        {status === 'calling' && false && (
           <div className="mt-6 flex gap-2">
             {[0, 1, 2].map((i) => (
               <span
