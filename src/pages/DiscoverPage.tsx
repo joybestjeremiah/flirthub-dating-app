@@ -8,6 +8,7 @@ export default function DiscoverPage() {
   const { user } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [passedIds, setPassedIds] = useState<Set<string>>(new Set());
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -21,12 +22,17 @@ export default function DiscoverPage() {
     if (!user) return;
     setLoading(true);
 
-    const [{ data: profileData, error: profileError }, { data: likesData, error: likesError }] = await Promise.all([
+    const [
+      { data: profileData, error: profileError },
+      { data: likesData, error: likesError },
+      { data: passesData, error: passesError },
+    ] = await Promise.all([
       supabase.from('profiles').select('*').neq('id', user.id),
       supabase.from('likes').select('to_user').eq('from_user', user.id),
+      supabase.from('passes').select('to_user').eq('from_user', user.id),
     ]);
 
-    if (profileError || likesError) {
+    if (profileError || likesError || passesError) {
       console.error('Failed to load discovery data', profileError ?? likesError);
       setProfiles([]);
       setLoading(false);
@@ -34,10 +40,12 @@ export default function DiscoverPage() {
     }
 
     const likedSet = new Set((likesData || []).map((l: { to_user: string }) => l.to_user));
+    const passedSet = new Set((passesData || []).map((p: { to_user: string }) => p.to_user));
     setLikedIds(likedSet);
+    setPassedIds(passedSet);
 
     const filtered = (profileData || []).filter(
-      (p) => !likedSet.has((p as Profile).id)
+      (p) => !likedSet.has((p as Profile).id) && !passedSet.has((p as Profile).id)
     ) as Profile[];
     setProfiles(filtered);
     setLoading(false);
@@ -93,9 +101,26 @@ export default function DiscoverPage() {
     setActionLoading(false);
   };
 
-  const handlePass = () => {
-    if (actionLoading) return;
+  const handlePass = async () => {
+    if (!user || actionLoading) return;
+    const target = profiles[currentIdx];
+    if (!target) return;
+    setActionLoading(true);
+
+    const { error } = await supabase.from('passes').upsert(
+      { from_user: user.id, to_user: target.id },
+      { onConflict: 'from_user,to_user', ignoreDuplicates: true }
+    );
+
+    if (error) {
+      console.error('Failed to save pass', error);
+      setActionLoading(false);
+      return;
+    }
+
+    setPassedIds((prev) => new Set(prev).add(target.id));
     setCurrentIdx((prev) => prev + 1);
+    setActionLoading(false);
   };
 
   if (loading) {
