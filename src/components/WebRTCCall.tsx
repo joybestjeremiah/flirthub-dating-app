@@ -23,6 +23,9 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   const [camera, setCamera] = useState(call.call_type === 'video');
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
+  const [remoteReady, setRemoteReady] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const appliedCandidates = useRef(new Set<string>());
 
@@ -52,14 +55,22 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
           setConnectionState(connection.connectionState);
           if (connection.connectionState === 'failed' || connection.connectionState === 'disconnected') {
             setError('The call connection was lost. Please try again.');
+            if (timer.current) {
+              clearInterval(timer.current);
+              timer.current = null;
+            }
           } else if (connection.connectionState === 'connected') {
             setError(null);
+            if (!timer.current) {
+              timer.current = setInterval(() => setElapsed(value => value + 1), 1000);
+            }
           }
         };
 
         connection.ontrack = event => {
           if (remoteVideo.current && event.streams[0]) {
             remoteVideo.current.srcObject = event.streams[0];
+            setRemoteReady(true);
           }
         };
 
@@ -155,10 +166,20 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
       mounted = false;
       if (channel) void supabase.removeChannel(channel);
       local.current?.getTracks().forEach(track => track.stop());
+      if (timer.current) {
+        clearInterval(timer.current);
+        timer.current = null;
+      }
       pc.current?.close();
       pc.current = null;
     };
   }, [call, role, onClose]);
+
+  const formatElapsed = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const remaining = (seconds % 60).toString().padStart(2, '0');
+    return `${minutes}:${remaining}`;
+  };
 
   const endCall = async () => {
     await supabase.from('calls').update({
@@ -185,6 +206,11 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   return (
     <div className="fixed inset-0 z-[70] bg-gray-950 flex flex-col">
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+        {connectionState === 'connected' && !remoteReady && !error && (
+          <div className="absolute top-5 left-5 right-5 z-10 rounded-xl bg-black/50 px-4 py-2 text-center text-white text-sm backdrop-blur">
+            Waiting for remote media…
+          </div>
+        )}
         {connectionState !== 'connected' && !error && (
           <div className="absolute top-5 left-5 right-5 z-10 rounded-xl bg-black/50 px-4 py-2 text-center text-white text-sm backdrop-blur">
             {connectionState === 'connecting' ? 'Connecting call…' : 'Setting up call…'}
@@ -203,7 +229,9 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
         )}
         {error && <div className="absolute bottom-6 left-6 right-6 rounded-xl bg-red-500/90 p-3 text-white text-sm text-center">{error}</div>}
       </div>
-      <div className="flex justify-center items-center gap-5 p-7">
+      <div className="flex flex-col items-center gap-4 p-7">
+        {connectionState === 'connected' && <div className="text-white text-sm font-medium tabular-nums">{formatElapsed(elapsed)}</div>}
+        <div className="flex justify-center items-center gap-5">
         <button onClick={toggleMute} className="w-14 h-14 rounded-full bg-white/15 text-white flex items-center justify-center">
           {muted ? <MicOff /> : <Mic />}
         </button>
@@ -212,9 +240,10 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             {camera ? <Video /> : <VideoOff />}
           </button>
         )}
-        <button onClick={endCall} className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center">
-          <Phone className="rotate-[135deg]" />
-        </button>
+          <button onClick={endCall} className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center">
+            <Phone className="rotate-[135deg]" />
+          </button>
+        </div>
       </div>
     </div>
   );
