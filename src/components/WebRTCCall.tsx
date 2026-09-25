@@ -45,6 +45,10 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const appliedCandidates = useRef(new Set<string>());
+  const currentOfferSdp = useRef<string | null>(null);
+  const lastHandledOfferSdp = useRef<string | null>(null);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnecting = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -93,16 +97,40 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
           for (const candidate of pending) await addRemoteCandidate(candidate);
         };
 
+        const restartIce = async () => {
+          if (role !== 'caller' || reconnecting.current || connection.connectionState === 'closed') return;
+          reconnecting.current = true;
+          try {
+            connection.restartIce();
+            const offer = await connection.createOffer({ iceRestart: true });
+            await connection.setLocalDescription(offer);
+            await supabase.from('calls').update({
+              offer: { type: offer.type, sdp: offer.sdp },
+              answer: null,
+              status: 'accepted',
+            }).eq('id', call.id);
+            setError('Reconnecting call…');
+          } catch (restartError) {
+            console.warn('ICE restart failed', restartError);
+            setError('The call connection was lost. Please try again.');
+          } finally {
+            reconnecting.current = false;
+          }
+        };
+
         connection.onconnectionstatechange = () => {
           setConnectionState(connection.connectionState);
-          if (connection.connectionState === 'failed' || connection.connectionState === 'disconnected') {
-            setError('The call connection was lost. Please try again.');
-            if (timer.current) {
-              clearInterval(timer.current);
-              timer.current = null;
-            }
+          if (connection.connectionState === 'failed') {
+            if (timer.current) { clearInterval(timer.current); timer.current = null; }
+            void restartIce();
+          } else if (connection.connectionState === 'disconnected') {
+            setError('Connection interrupted. Reconnecting…');
+            if (timer.current) { clearInterval(timer.current); timer.current = null; }
+            if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+            reconnectTimer.current = setTimeout(() => void restartIce(), 2500);
           } else if (connection.connectionState === 'connected') {
             setError(null);
+            if (reconnectTimer.current) { clearTimeout(reconnectTimer.current); reconnectTimer.current = null; }
             if (!timer.current) {
               timer.current = setInterval(() => setElapsed(value => value + 1), 1000);
             }
@@ -151,9 +179,18 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
               return;
             }
 
-            if (role === 'caller' && updated.answer && !connection.currentRemoteDescription) {
+            if (role === 'caller' && updated.answer && (!connection.currentRemoteDescription || updated.offer?.sdp !== currentOfferSdp.current)) {
               await connection.setRemoteDescription(updated.answer);
               await flushPendingCandidates();
+            }
+
+            if (role === 'callee' && updated.offer && updated.offer.sdp !== lastHandledOfferSdp.current) {
+              lastHandledOfferSdp.current = updated.offer.sdp || null;
+              await connection.setRemoteDescription(updated.offer);
+              await flushPendingCandidates();
+              const answer = await connection.createAnswer();
+              await connection.setLocalDescription(answer);
+              await supabase.from('calls').update({ answer: { type: answer.type, sdp: answer.sdp }, status: 'accepted' }).eq('id', call.id);
             }
           })
           .subscribe();
@@ -182,9 +219,8 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
           if (!currentCall.offer) {
             const offer = await connection.createOffer();
             await connection.setLocalDescription(offer);
-            await supabase.from('calls').update({
-              offer: { type: offer.type, sdp: offer.sdp },
-            }).eq('id', call.id);
+            currentOfferSdp.current = offer.sdp || null;
+            await supabase.from('calls').update({ offer: { type: offer.type, sdp: offer.sdp } }).eq('id', call.id);
           } else {
             await connection.setLocalDescription(currentCall.offer);
           }
