@@ -74,18 +74,16 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
           }
         };
 
-        const appendCandidate = async (field: 'caller_ice' | 'callee_ice', candidate: RTCIceCandidate) => {
-          const { data } = await supabase.from('calls').select(field).eq('id', call.id).single();
-          const current = ((data?.[field] as RTCIceCandidateInit[] | null) || []);
-          await supabase.from('calls').update({
-            [field]: [...current, candidate.toJSON()],
-          }).eq('id', call.id);
+        const appendCandidate = async (candidate: RTCIceCandidate) => {
+          await supabase.from('call_ice_candidates').insert({
+            call_id: call.id,
+            user_id: role === 'caller' ? call.caller : (await supabase.auth.getUser()).data.user?.id,
+            candidate: candidate.toJSON(),
+          });
         };
 
         connection.onicecandidate = event => {
-          if (event.candidate) {
-            void appendCandidate(role === 'caller' ? 'caller_ice' : 'callee_ice', event.candidate);
-          }
+          if (event.candidate) void appendCandidate(event.candidate);
         };
 
         channel = supabase.channel(`webrtc-call-${call.id}`);
@@ -107,31 +105,30 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
               await connection.setRemoteDescription(updated.answer);
             }
 
-            const remoteCandidates = role === 'caller'
-              ? (updated.callee_ice || [])
-              : (updated.caller_ice || []);
-
-            for (const candidate of remoteCandidates) {
-              const key = candidate.candidate || JSON.stringify(candidate);
-              if (appliedCandidates.current.has(key)) continue;
-              if (!connection.remoteDescription) {
-                pendingCandidates.current.push(candidate);
-                continue;
-              }
-              try {
-                await connection.addIceCandidate(candidate);
-                appliedCandidates.current.add(key);
-              } catch {}
+            if (updated.answer && role === 'caller' && !connection.currentRemoteDescription) {
+              await connection.setRemoteDescription(updated.answer);
             }
-
-            if (connection.remoteDescription && pendingCandidates.current.length) {
-              for (const candidate of pendingCandidates.current.splice(0)) {
-                try {
-                  await connection.addIceCandidate(candidate);
-                  appliedCandidates.current.add(candidate.candidate || JSON.stringify(candidate));
-                } catch {}
-              }
+          })
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'call_ice_candidates',
+            filter: `call_id=eq.${call.id}`,
+          }, async payload => {
+            const row = payload.new as { user_id: string; candidate: RTCIceCandidateInit };
+            const currentUser = (await supabase.auth.getUser()).data.user?.id;
+            if (!currentUser || row.user_id === currentUser) return;
+            const candidate = row.candidate;
+            const key = candidate.candidate || JSON.stringify(candidate);
+            if (appliedCandidates.current.has(key)) return;
+            if (!connection.remoteDescription) {
+              pendingCandidates.current.push(candidate);
+              return;
             }
+            try {
+              await connection.addIceCandidate(candidate);
+              appliedCandidates.current.add(key);
+            } catch {}
           })
           .subscribe();
 
