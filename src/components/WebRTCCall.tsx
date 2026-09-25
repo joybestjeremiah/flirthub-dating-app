@@ -49,6 +49,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   const lastHandledOfferSdp = useRef<string | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnecting = useRef(false);
+  const terminalCleanup = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -175,6 +176,8 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             const updated = payload.new as Call;
 
             if (updated.status === 'ended' || updated.status === 'rejected') {
+              terminalCleanup.current = true;
+              await supabase.rpc('cleanup_call_ice_candidates', { p_call_id: call.id });
               onClose();
               return;
             }
@@ -264,6 +267,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   };
 
   const endCall = async () => {
+    terminalCleanup.current = true;
     await supabase.from('calls').update({
       status: 'ended',
       ended_at: new Date().toISOString(),
