@@ -10,8 +10,25 @@ interface Props {
   onClose: () => void;
 }
 
+const iceServers: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+];
+
+const turnUrl = import.meta.env.VITE_TURN_URL as string | undefined;
+const turnUsername = import.meta.env.VITE_TURN_USERNAME as string | undefined;
+const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL as string | undefined;
+
+if (turnUrl && turnUsername && turnCredential) {
+  iceServers.push({
+    urls: turnUrl,
+    username: turnUsername,
+    credential: turnCredential,
+  });
+}
+
 const config: RTCConfiguration = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  iceServers,
+  iceTransportPolicy: 'all',
 };
 
 export default function WebRTCCall({ call, role, otherProfile, onClose }: Props) {
