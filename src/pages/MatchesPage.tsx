@@ -9,6 +9,7 @@ import CallModal from '@/components/CallModal';
 interface MatchWithProfile extends Match {
   otherProfile: Profile;
   lastMessage?: Message;
+  unreadCount: number;
 }
 
 interface Props {
@@ -27,7 +28,21 @@ export default function MatchesPage({ onBack }: Props) {
 
   useEffect(() => {
     loadMatches();
-  }, []);
+    if (!user) return;
+    const channel = supabase
+      .channel('matches-unread')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const incoming = payload.new as Message;
+        if (incoming.sender === user.id) return;
+        setMatches((prev) => prev.map((m) =>
+          m.id === incoming.match_id
+            ? { ...m, lastMessage: incoming, unreadCount: m.id === activeMatch?.id ? m.unreadCount : m.unreadCount + 1 }
+            : m
+        ));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, activeMatch?.id]);
 
   const loadMatches = async () => {
     if (!user) return;
@@ -68,10 +83,17 @@ export default function MatchesPage({ onBack }: Props) {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+        const { count: unreadCount } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('match_id', m.id)
+          .eq('read', false)
+          .neq('sender', user.id);
         return {
           ...m,
           otherProfile: profile as Profile,
           lastMessage: lastMsg as Message | undefined,
+          unreadCount: unreadCount ?? 0,
         };
       })
     );
@@ -85,7 +107,7 @@ export default function MatchesPage({ onBack }: Props) {
       setShowSubModal(true);
       return;
     }
-    setActiveMatch(match);
+    setActiveMatch({ ...match, unreadCount: 0 });
   };
 
   const handleCallClick = (type: 'audio' | 'video') => {
@@ -182,6 +204,11 @@ export default function MatchesPage({ onBack }: Props) {
                   : match.otherProfile?.city || 'Say hello!'}
               </div>
             </div>
+            {match.unreadCount > 0 && (
+              <span className="min-w-6 h-6 px-1.5 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center">
+                {match.unreadCount > 99 ? '99+' : match.unreadCount}
+              </span>
+            )}
             {!hasActiveSubscription && (
               <Lock className="w-5 h-5 text-rose-400 flex-shrink-0" />
             )}
@@ -259,7 +286,9 @@ function ChatView({
       console.error('Failed to load messages', error);
       setMessages([]);
     } else {
-      setMessages((data || []) as Message[]);
+      const items = (data || []) as Message[];
+      setMessages(items);
+      await markIncomingAsRead(items);
     }
     setLoading(false);
   };
