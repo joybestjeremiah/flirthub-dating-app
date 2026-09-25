@@ -107,11 +107,12 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             const offer = await connection.createOffer({ iceRestart: true });
             await connection.setLocalDescription(offer);
             currentOfferSdp.current = offer.sdp || null;
-            await supabase.from('calls').update({
+            const { error: restartError } = await supabase.from('calls').update({
               offer: { type: offer.type, sdp: offer.sdp },
               answer: null,
               status: 'accepted',
             }).eq('id', call.id);
+            if (restartError) throw restartError;
             setError('Reconnecting call…');
           } catch (restartError) {
             console.warn('ICE restart failed', restartError);
@@ -197,7 +198,8 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
               await flushPendingCandidates();
               const answer = await connection.createAnswer();
               await connection.setLocalDescription(answer);
-              await supabase.from('calls').update({ answer: { type: answer.type, sdp: answer.sdp }, status: 'accepted' }).eq('id', call.id);
+              const { error: answerError } = await supabase.from('calls').update({ answer: { type: answer.type, sdp: answer.sdp }, status: 'accepted' }).eq('id', call.id);
+              if (answerError) console.warn('Failed to publish call answer', answerError);
             }
           })
           .subscribe();
@@ -231,6 +233,10 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
           } else {
             await connection.setLocalDescription(currentCall.offer);
             currentOfferSdp.current = currentCall.offer.sdp || null;
+            if (currentCall.answer) {
+              await connection.setRemoteDescription(currentCall.answer);
+              await flushPendingCandidates();
+            }
           }
         } else if (currentCall.offer && !connection.currentRemoteDescription) {
           lastHandledOfferSdp.current = currentCall.offer.sdp || null;
