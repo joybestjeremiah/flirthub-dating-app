@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Phone, Video, X, Mic, MicOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import type { Match, Profile } from '@/lib/types';
+import type { Call, Match, Profile } from '@/lib/types';
+import WebRTCCall from '@/components/WebRTCCall';
 
 interface MatchWithProfile extends Match {
   otherProfile: Profile;
@@ -19,6 +20,7 @@ export default function CallModal({ match, callType, onClose }: Props) {
   const [status, setStatus] = useState<'calling' | 'ended'>('calling');
   const [muted, setMuted] = useState(false);
   const [callId, setCallId] = useState<string | null>(null);
+  const [call, setCall] = useState<Call | null>(null);
 
   useEffect(() => {
     const startCall = async () => {
@@ -38,6 +40,7 @@ export default function CallModal({ match, callType, onClose }: Props) {
       }
 
       setCallId(data.id);
+      setCall({ id: data.id, match_id: match.id, caller: user.id, call_type: callType, status: 'initiated', started_at: '', ended_at: null });
     };
     startCall();
   }, [user, match.id, callType, onClose]);
@@ -55,6 +58,8 @@ export default function CallModal({ match, callType, onClose }: Props) {
   };
 
   const other = match.otherProfile;
+
+  if (call) return <WebRTCCall call={call} role="caller" otherProfile={other} onClose={onClose} />;
 
   return (
     <div className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-rose-950 to-gray-900 flex flex-col items-center justify-between p-8">
