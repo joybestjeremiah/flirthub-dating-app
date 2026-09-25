@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Message, Match } from '@/lib/types';
@@ -241,6 +241,14 @@ function ChatView({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
+  const markIncomingAsRead = async (items: Message[]) => {
+    if (!user) return;
+    const unreadIds = items.filter((m) => m.sender !== user.id && !m.read).map((m) => m.id);
+    if (unreadIds.length === 0) return;
+    const { error } = await supabase.from('messages').update({ read: true }).in('id', unreadIds);
+    if (error) console.error('Failed to mark messages read', error);
+  };
+
   const loadMessages = async () => {
     const { data, error } = await supabase
       .from('messages')
@@ -339,7 +347,12 @@ function ChatView({
                       : 'bg-white text-gray-800 rounded-bl-md shadow-sm border border-gray-100'
                   }`}
                 >
-                  {msg.content}
+                  <div>{msg.content}</div>
+                  {isMine && (
+                    <div className="mt-1 flex justify-end">
+                      {msg.read ? <CheckCheck className="w-3.5 h-3.5 text-white/80" /> : <Check className="w-3.5 h-3.5 text-white/70" />}
+                    </div>
+                  )}
                 </div>
               </div>
             );
