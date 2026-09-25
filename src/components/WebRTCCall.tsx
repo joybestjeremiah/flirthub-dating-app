@@ -105,6 +105,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             connection.restartIce();
             const offer = await connection.createOffer({ iceRestart: true });
             await connection.setLocalDescription(offer);
+            currentOfferSdp.current = offer.sdp || null;
             await supabase.from('calls').update({
               offer: { type: offer.type, sdp: offer.sdp },
               answer: null,
@@ -256,7 +257,9 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
       }
       pc.current?.close();
       pc.current = null;
-      void supabase.rpc('cleanup_call_ice_candidates', { p_call_id: call.id });
+      if (terminalCleanup.current) {
+        void supabase.rpc('cleanup_call_ice_candidates', { p_call_id: call.id });
+      }
     };
   }, [call.id, call.call_type, call.caller, role, onClose]);
 
