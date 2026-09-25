@@ -170,6 +170,31 @@ export default function AdminPanel({ onBack }: Props) {
     loadStats();
   };
 
+  const handleApproveSubscription = async (sub: Subscription) => {
+    if (!confirm('Approve this subscription request?')) return;
+    setActionBusy(true);
+    setActionError(null);
+    const days = sub.plan === 'weekly' ? 7 : 30;
+    const starts = new Date();
+    const expires = new Date(starts);
+    expires.setDate(expires.getDate() + days);
+    const { error } = await supabase
+      .from('subscriptions')
+      .update({
+        status: 'active',
+        starts_at: starts.toISOString(),
+        expires_at: expires.toISOString(),
+      })
+      .eq('id', sub.id);
+    setActionBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    await loadSubscriptions();
+    await loadStats();
+  };
+
   const handleRevokeSubscription = async (subId: string) => {
     if (!confirm('Revoke this subscription?')) return;
     setActionBusy(true);
@@ -458,6 +483,7 @@ export default function AdminPanel({ onBack }: Props) {
                 <tbody className="divide-y divide-gray-50">
                   {subscriptions.map((s) => {
                     const expired = new Date(s.expires_at) < new Date();
+                    const pending = s.status === 'pending';
                     return (
                       <tr key={s.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
@@ -475,6 +501,15 @@ export default function AdminPanel({ onBack }: Props) {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
+                          {pending && (
+                            <button
+                              onClick={() => handleApproveSubscription(s)}
+                              disabled={actionBusy}
+                              className="text-sm text-green-600 font-medium hover:text-green-700 disabled:opacity-50 disabled:cursor-not-allowed mr-3"
+                            >
+                              Approve
+                            </button>
+                          )}
                           <button
                             onClick={() => handleRevokeSubscription(s.id)}
                             disabled={actionBusy}
