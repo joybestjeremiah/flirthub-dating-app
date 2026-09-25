@@ -291,7 +291,7 @@ function ChatView({
     if (!user) return;
     const unreadIds = items.filter((m) => m.sender !== user.id && !m.read).map((m) => m.id);
     if (unreadIds.length === 0) return;
-    const { error } = await supabase.from('messages').update({ read: true }).in('id', unreadIds);
+    const { error } = await supabase.rpc('mark_match_messages_read', { p_match_id: match.id });
     if (error) console.error('Failed to mark messages read', error);
   };
 
