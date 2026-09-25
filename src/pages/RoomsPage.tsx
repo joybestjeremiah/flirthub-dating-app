@@ -81,10 +81,17 @@ export default function RoomsPage({ onBack }: Props) {
       return;
     }
     if (room.owner !== user?.id) {
-      await supabase.from('room_members').insert({
-        room_id: room.id,
-        user_id: user!.id,
-      });
+      const { error } = await supabase.from('room_members').upsert(
+        {
+          room_id: room.id,
+          user_id: user!.id,
+        },
+        { onConflict: 'room_id,user_id', ignoreDuplicates: true }
+      );
+      if (error) {
+        console.error('Failed to join room', error);
+        return;
+      }
     }
     setActiveRoom(room);
   };
@@ -247,7 +254,12 @@ function RoomChatView({ room, onBack }: { room: Room; onBack: () => void }) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'room_messages', filter: `room_id=eq.${room.id}` },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as RoomMessage]);
+          const incoming = payload.new as RoomMessage;
+          setMessages((prev) =>
+            prev.some((message) => message.id === incoming.id)
+              ? prev
+              : [...prev, incoming]
+          );
         }
       )
       .subscribe();
@@ -300,7 +312,12 @@ function RoomChatView({ room, onBack }: { room: Room; onBack: () => void }) {
       .select('*')
       .single();
 
-    if (data) setMessages((prev) => [...prev, data as RoomMessage]);
+    if (data) {
+      const sent = data as RoomMessage;
+      setMessages((prev) =>
+        prev.some((message) => message.id === sent.id) ? prev : [...prev, sent]
+      );
+    }
   };
 
   return (
