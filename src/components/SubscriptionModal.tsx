@@ -73,8 +73,8 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-3">
                 <Check className="w-8 h-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Subscription Active!</h3>
-              <p className="text-gray-500 text-sm mt-1">Enjoy your premium features</p>
+              <h3 className="text-lg font-bold text-gray-900">Request Submitted!</h3>
+              <p className="text-gray-500 text-sm mt-1">Your subscription is pending admin approval.</p>
             </div>
           ) : (
             <>
