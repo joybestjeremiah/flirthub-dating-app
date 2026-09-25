@@ -52,6 +52,10 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
 
     const run = async () => {
       try {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError || !authData.user) throw new Error('Authentication required');
+        const currentUserId = authData.user.id;
+
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video: call.call_type === 'video',
@@ -67,6 +71,27 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
         const connection = new RTCPeerConnection(config);
         pc.current = connection;
         stream.getTracks().forEach(track => connection.addTrack(track, stream));
+
+        const addRemoteCandidate = async (candidate: RTCIceCandidateInit) => {
+          const key = candidate.candidate || JSON.stringify(candidate);
+          if (appliedCandidates.current.has(key)) return;
+          if (!connection.remoteDescription) {
+            pendingCandidates.current.push(candidate);
+            return;
+          }
+          try {
+            await connection.addIceCandidate(candidate);
+            appliedCandidates.current.add(key);
+          } catch (candidateError) {
+            console.warn('Failed to add remote ICE candidate', candidateError);
+          }
+        };
+
+        const flushPendingCandidates = async () => {
+          const pending = [...pendingCandidates.current];
+          pendingCandidates.current = [];
+          for (const candidate of pending) await addRemoteCandidate(candidate);
+        };
 
         connection.onconnectionstatechange = () => {
           setConnectionState(connection.connectionState);
@@ -85,46 +110,34 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
         };
 
         connection.ontrack = event => {
-          if (remoteVideo.current && event.streams[0]) {
-            remoteVideo.current.srcObject = event.streams[0];
+          const stream = event.streams[0];
+          if (remoteVideo.current && stream) {
+            remoteVideo.current.srcObject = stream;
             setRemoteReady(true);
           }
         };
 
-        const appendCandidate = async (candidate: RTCIceCandidate) => {
-          await supabase.from('call_ice_candidates').insert({
+        connection.onicecandidate = event => {
+          if (!event.candidate) return;
+          void supabase.from('call_ice_candidates').insert({
             call_id: call.id,
-            user_id: role === 'caller' ? call.caller : (await supabase.auth.getUser()).data.user?.id,
-            candidate: candidate.toJSON(),
+            user_id: currentUserId,
+            candidate: event.candidate.toJSON(),
           });
         };
 
-        connection.onicecandidate = event => {
-          if (event.candidate) void appendCandidate(event.candidate);
-        };
-
         channel = supabase.channel(`webrtc-call-${call.id}`);
-        channel.on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_ice_candidates',
-          filter: `call_id=eq.${call.id}`,
-        }, async payload => {
-          const row = payload.new as { user_id: string; candidate: RTCIceCandidateInit };
-          if ((role === 'caller' && row.user_id === call.caller) || (role === 'callee' && row.user_id !== call.caller)) return;
-          const candidate = row.candidate;
-          const key = candidate.candidate || JSON.stringify(candidate);
-          if (appliedCandidates.current.has(key)) return;
-          if (!connection.remoteDescription) {
-            pendingCandidates.current.push(candidate);
-            return;
-          }
-          try {
-            await connection.addIceCandidate(candidate);
-            appliedCandidates.current.add(key);
-          } catch {}
-        });
         channel
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'call_ice_candidates',
+            filter: `call_id=eq.${call.id}`,
+          }, async payload => {
+            const row = payload.new as { user_id: string; candidate: RTCIceCandidateInit };
+            if (row.user_id === currentUserId) return;
+            await addRemoteCandidate(row.candidate);
+          })
           .on('postgres_changes', {
             event: 'UPDATE',
             schema: 'public',
@@ -140,32 +153,8 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
 
             if (role === 'caller' && updated.answer && !connection.currentRemoteDescription) {
               await connection.setRemoteDescription(updated.answer);
+              await flushPendingCandidates();
             }
-
-            if (updated.answer && role === 'caller' && !connection.currentRemoteDescription) {
-              await connection.setRemoteDescription(updated.answer);
-            }
-          })
-          .on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'call_ice_candidates',
-            filter: `call_id=eq.${call.id}`,
-          }, async payload => {
-            const row = payload.new as { user_id: string; candidate: RTCIceCandidateInit };
-            const currentUser = (await supabase.auth.getUser()).data.user?.id;
-            if (!currentUser || row.user_id === currentUser) return;
-            const candidate = row.candidate;
-            const key = candidate.candidate || JSON.stringify(candidate);
-            if (appliedCandidates.current.has(key)) return;
-            if (!connection.remoteDescription) {
-              pendingCandidates.current.push(candidate);
-              return;
-            }
-            try {
-              await connection.addIceCandidate(candidate);
-              appliedCandidates.current.add(key);
-            } catch {}
           })
           .subscribe();
 
@@ -177,31 +166,31 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
 
         if (existingCandidates) {
           for (const row of existingCandidates as { user_id: string; candidate: RTCIceCandidateInit }[]) {
-            if ((role === 'caller' && row.user_id === call.caller) || (role === 'callee' && row.user_id !== call.caller)) continue;
-            const key = row.candidate.candidate || JSON.stringify(row.candidate);
-            if (appliedCandidates.current.has(key)) continue;
-            if (!connection.remoteDescription) {
-              pendingCandidates.current.push(row.candidate);
-              continue;
-            }
-            try {
-              await connection.addIceCandidate(row.candidate);
-              appliedCandidates.current.add(key);
-            } catch {}
+            if (row.user_id !== currentUserId) await addRemoteCandidate(row.candidate);
           }
         }
 
-        const { data: current } = await supabase.from('calls').select('*').eq('id', call.id).single();
+        const { data: current, error: callError } = await supabase
+          .from('calls')
+          .select('*')
+          .eq('id', call.id)
+          .single();
+        if (callError || !current) throw callError || new Error('Call not found');
         const currentCall = current as Call;
 
         if (role === 'caller') {
-          const offer = await connection.createOffer();
-          await connection.setLocalDescription(offer);
-          await supabase.from('calls').update({
-            offer: { type: offer.type, sdp: offer.sdp },
-          }).eq('id', call.id);
-        } else if (currentCall.offer) {
+          if (!currentCall.offer) {
+            const offer = await connection.createOffer();
+            await connection.setLocalDescription(offer);
+            await supabase.from('calls').update({
+              offer: { type: offer.type, sdp: offer.sdp },
+            }).eq('id', call.id);
+          } else {
+            await connection.setLocalDescription(currentCall.offer);
+          }
+        } else if (currentCall.offer && !connection.currentRemoteDescription) {
           await connection.setRemoteDescription(currentCall.offer);
+          await flushPendingCandidates();
           const answer = await connection.createAnswer();
           await connection.setLocalDescription(answer);
           await supabase.from('calls').update({
@@ -229,7 +218,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
       pc.current?.close();
       pc.current = null;
     };
-  }, [call, role, onClose]);
+  }, [call.id, call.call_type, call.caller, role, onClose]);
 
   const formatElapsed = (seconds: number) => {
     const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -288,14 +277,14 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
       <div className="flex flex-col items-center gap-4 p-7">
         {connectionState === 'connected' && <div className="text-white text-sm font-medium tabular-nums">{formatElapsed(elapsed)}</div>}
         <div className="flex justify-center items-center gap-5">
-        <button onClick={toggleMute} className="w-14 h-14 rounded-full bg-white/15 text-white flex items-center justify-center">
-          {muted ? <MicOff /> : <Mic />}
-        </button>
-        {call.call_type === 'video' && (
-          <button onClick={toggleCamera} className="w-14 h-14 rounded-full bg-white/15 text-white flex items-center justify-center">
-            {camera ? <Video /> : <VideoOff />}
+          <button onClick={toggleMute} className="w-14 h-14 rounded-full bg-white/15 text-white flex items-center justify-center">
+            {muted ? <MicOff /> : <Mic />}
           </button>
-        )}
+          {call.call_type === 'video' && (
+            <button onClick={toggleCamera} className="w-14 h-14 rounded-full bg-white/15 text-white flex items-center justify-center">
+              {camera ? <Video /> : <VideoOff />}
+            </button>
+          )}
           <button onClick={endCall} className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center">
             <Phone className="rotate-[135deg]" />
           </button>
