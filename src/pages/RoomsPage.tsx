@@ -18,6 +18,7 @@ export default function RoomsPage({ onBack }: Props) {
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomDesc, setNewRoomDesc] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadRooms();
@@ -26,6 +27,7 @@ export default function RoomsPage({ onBack }: Props) {
   const loadRooms = async () => {
     if (!user) return;
     setLoading(true);
+    setError(null);
 
     const ownerRooms = await supabase
       .from('rooms')
@@ -57,7 +59,8 @@ export default function RoomsPage({ onBack }: Props) {
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const { data } = await supabase
+    setError(null);
+    const { data, error } = await supabase
       .from('rooms')
       .insert({
         name: newRoomName,
@@ -67,6 +70,11 @@ export default function RoomsPage({ onBack }: Props) {
       .select('*')
       .single();
 
+    if (error) {
+      console.error('Failed to create room', error);
+      setError('Could not create the room. Please try again.');
+      return;
+    }
     if (data) {
       setShowCreate(false);
       setNewRoomName('');
@@ -97,7 +105,12 @@ export default function RoomsPage({ onBack }: Props) {
   };
 
   const handleDeleteRoom = async (roomId: string) => {
-    await supabase.from('rooms').delete().eq('id', roomId);
+    const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+    if (error) {
+      console.error('Failed to delete room', error);
+      setError('Could not delete the room. Please try again.');
+      return;
+    }
     setRooms((prev) => prev.filter((r) => r.id !== roomId));
   };
 
@@ -145,6 +158,11 @@ export default function RoomsPage({ onBack }: Props) {
       {loading ? (
         <div className="flex items-center justify-center h-[40vh]">
           <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <p className="text-red-500 text-sm">{error}</p>
+          <button onClick={loadRooms} className="mt-3 px-5 py-2 rounded-xl bg-rose-500 text-white font-semibold">Retry</button>
         </div>
       ) : rooms.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[50vh] text-center">
@@ -274,12 +292,17 @@ function RoomChatView({ room, onBack }: { room: Room; onBack: () => void }) {
   }, [messages]);
 
   const loadMessages = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('room_messages')
       .select('*')
       .eq('room_id', room.id)
       .order('created_at', { ascending: true });
-    setMessages((data || []) as RoomMessage[]);
+    if (error) {
+      console.error('Failed to load room messages', error);
+      setMessages([]);
+    } else {
+      setMessages((data || []) as RoomMessage[]);
+    }
 
     const senderIds = Array.from(new Set((data || []).map((m: { sender: string }) => m.sender)));
     if (senderIds.length > 0) {
@@ -302,7 +325,7 @@ function RoomChatView({ room, onBack }: { room: Room; onBack: () => void }) {
     const content = input.trim();
     setInput('');
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('room_messages')
       .insert({
         room_id: room.id,
@@ -312,6 +335,11 @@ function RoomChatView({ room, onBack }: { room: Room; onBack: () => void }) {
       .select('*')
       .single();
 
+    if (error) {
+      console.error('Failed to send room message', error);
+      setInput(content);
+      return;
+    }
     if (data) {
       const sent = data as RoomMessage;
       setMessages((prev) =>
