@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Heart, X, MapPin, Loader2, Search } from 'lucide-react';
+import { Heart, X, MapPin, Loader2, Search, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
@@ -11,6 +11,7 @@ export default function DiscoverPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [matchedProfile, setMatchedProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     loadProfiles();
@@ -73,7 +74,7 @@ export default function DiscoverPage() {
     if (reverseLike) {
       const userA = user.id < target.id ? user.id : target.id;
       const userB = user.id < target.id ? target.id : user.id;
-      const { error: matchError } = await supabase.from('matches').upsert(
+      const { data: matchData, error: matchError } = await supabase.from('matches').upsert(
         {
           user1: userA,
           user2: userB,
@@ -82,6 +83,8 @@ export default function DiscoverPage() {
       );
       if (matchError) {
         console.error('Failed to create match', matchError);
+      } else if (matchData) {
+        setMatchedProfile(target);
       }
     }
 
@@ -125,6 +128,26 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6">
+      {matchedProfile && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-7 text-center shadow-2xl">
+            <div className="mx-auto w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mb-4">
+              <Sparkles className="w-8 h-8 text-rose-500" />
+            </div>
+            <h2 className="text-3xl font-black text-gray-900">It’s a Match!</h2>
+            <p className="text-gray-500 mt-2">You and {matchedProfile.display_name} liked each other.</p>
+            <div className="w-24 h-24 mx-auto mt-5 rounded-full overflow-hidden bg-rose-100 border-4 border-rose-100">
+              {matchedProfile.photo_url ? (
+                <img src={matchedProfile.photo_url} alt={matchedProfile.display_name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center"><Heart className="w-10 h-10 text-rose-300" /></div>
+              )}
+            </div>
+            <button onClick={() => setMatchedProfile(null)} className="w-full mt-6 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold">Keep Discovering</button>
+          </div>
+        </div>
+      )}
+
       <div className="relative rounded-3xl overflow-hidden shadow-2xl bg-white">
         <div className="aspect-[3/4] relative bg-gradient-to-br from-rose-100 to-pink-100">
           {current.photo_url ? (
