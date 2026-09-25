@@ -22,6 +22,8 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   const [muted, setMuted] = useState(false);
   const [camera, setCamera] = useState(call.call_type === 'video');
   const [error, setError] = useState<string | null>(null);
+  const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const appliedCandidates = useRef(new Set<string>());
 
   useEffect(() => {
     let mounted = true;
@@ -44,6 +46,12 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
         const connection = new RTCPeerConnection(config);
         pc.current = connection;
         stream.getTracks().forEach(track => connection.addTrack(track, stream));
+
+        connection.onconnectionstatechange = () => {
+          if (connection.connectionState === 'failed' || connection.connectionState === 'disconnected') {
+            setError('The call connection was lost. Please try again.');
+          }
+        };
 
         connection.ontrack = event => {
           if (remoteVideo.current && event.streams[0]) {
@@ -89,9 +97,25 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
               : (updated.caller_ice || []);
 
             for (const candidate of remoteCandidates) {
+              const key = candidate.candidate || JSON.stringify(candidate);
+              if (appliedCandidates.current.has(key)) continue;
+              if (!connection.remoteDescription) {
+                pendingCandidates.current.push(candidate);
+                continue;
+              }
               try {
                 await connection.addIceCandidate(candidate);
+                appliedCandidates.current.add(key);
               } catch {}
+            }
+
+            if (connection.remoteDescription && pendingCandidates.current.length) {
+              for (const candidate of pendingCandidates.current.splice(0)) {
+                try {
+                  await connection.addIceCandidate(candidate);
+                  appliedCandidates.current.add(candidate.candidate || JSON.stringify(candidate));
+                } catch {}
+              }
             }
           })
           .subscribe();
