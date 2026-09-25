@@ -20,10 +20,17 @@ export default function DiscoverPage() {
     if (!user) return;
     setLoading(true);
 
-    const [{ data: profileData }, { data: likesData }] = await Promise.all([
+    const [{ data: profileData, error: profileError }, { data: likesData, error: likesError }] = await Promise.all([
       supabase.from('profiles').select('*').neq('id', user.id),
       supabase.from('likes').select('to_user').eq('from_user', user.id),
     ]);
+
+    if (profileError || likesError) {
+      console.error('Failed to load discovery data', profileError ?? likesError);
+      setProfiles([]);
+      setLoading(false);
+      return;
+    }
 
     const likedSet = new Set((likesData || []).map((l: { to_user: string }) => l.to_user));
     setLikedIds(likedSet);
@@ -42,10 +49,19 @@ export default function DiscoverPage() {
 
     setActionLoading(true);
 
-    await supabase.from('likes').insert({
-      from_user: user.id,
-      to_user: target.id,
-    });
+    const { error: likeError } = await supabase.from('likes').upsert(
+      {
+        from_user: user.id,
+        to_user: target.id,
+      },
+      { onConflict: 'from_user,to_user', ignoreDuplicates: true }
+    );
+
+    if (likeError) {
+      console.error('Failed to like profile', likeError);
+      setActionLoading(false);
+      return;
+    }
 
     const { data: reverseLike } = await supabase
       .from('likes')
@@ -57,10 +73,16 @@ export default function DiscoverPage() {
     if (reverseLike) {
       const userA = user.id < target.id ? user.id : target.id;
       const userB = user.id < target.id ? target.id : user.id;
-      await supabase.from('matches').insert({
-        user1: userA,
-        user2: userB,
-      });
+      const { error: matchError } = await supabase.from('matches').upsert(
+        {
+          user1: userA,
+          user2: userB,
+        },
+        { onConflict: 'user1,user2', ignoreDuplicates: true }
+      );
+      if (matchError) {
+        console.error('Failed to create match', matchError);
+      }
     }
 
     setLikedIds((prev) => new Set(prev).add(target.id));
