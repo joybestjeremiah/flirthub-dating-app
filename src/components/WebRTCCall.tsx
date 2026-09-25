@@ -50,6 +50,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnecting = useRef(false);
   const terminalCleanup = useRef(false);
+  const retryRecovery = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -119,6 +120,8 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             reconnecting.current = false;
           }
         };
+
+        retryRecovery.current = () => { void restartIce(); };
 
         connection.onconnectionstatechange = () => {
           setConnectionState(connection.connectionState);
@@ -227,8 +230,10 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             await supabase.from('calls').update({ offer: { type: offer.type, sdp: offer.sdp } }).eq('id', call.id);
           } else {
             await connection.setLocalDescription(currentCall.offer);
+            currentOfferSdp.current = currentCall.offer.sdp || null;
           }
         } else if (currentCall.offer && !connection.currentRemoteDescription) {
+          lastHandledOfferSdp.current = currentCall.offer.sdp || null;
           await connection.setRemoteDescription(currentCall.offer);
           await flushPendingCandidates();
           const answer = await connection.createAnswer();
@@ -257,6 +262,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
       }
       pc.current?.close();
       pc.current = null;
+      retryRecovery.current = null;
       if (terminalCleanup.current) {
         void supabase.rpc('cleanup_call_ice_candidates', { p_call_id: call.id });
       }
@@ -317,7 +323,19 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             <p className="mt-4 text-lg font-semibold">{otherProfile?.display_name || 'Call'}</p>
           </div>
         )}
-        {error && <div className="absolute bottom-6 left-6 right-6 rounded-xl bg-red-500/90 p-3 text-white text-sm text-center">{error}</div>}
+        {error && (
+          <div className="absolute bottom-6 left-6 right-6 rounded-xl bg-red-500/90 p-3 text-white text-sm text-center">
+            <div>{error}</div>
+            {connectionState !== 'connected' && (
+              <button
+                onClick={() => retryRecovery.current?.()}
+                className="mt-2 rounded-lg bg-white/20 px-3 py-1.5 font-medium hover:bg-white/30"
+              >
+                Try reconnecting
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex flex-col items-center gap-4 p-7">
         {connectionState === 'connected' && <div className="text-white text-sm font-medium tabular-nums">{formatElapsed(elapsed)}</div>}
