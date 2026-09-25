@@ -87,6 +87,26 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
         };
 
         channel = supabase.channel(`webrtc-call-${call.id}`);
+        channel.on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'call_ice_candidates',
+          filter: `call_id=eq.${call.id}`,
+        }, async payload => {
+          const row = payload.new as { user_id: string; candidate: RTCIceCandidateInit };
+          if (row.user_id === call.caller) return;
+          const candidate = row.candidate;
+          const key = candidate.candidate || JSON.stringify(candidate);
+          if (appliedCandidates.current.has(key)) return;
+          if (!connection.remoteDescription) {
+            pendingCandidates.current.push(candidate);
+            return;
+          }
+          try {
+            await connection.addIceCandidate(candidate);
+            appliedCandidates.current.add(key);
+          } catch {}
+        });
         channel
           .on('postgres_changes', {
             event: 'UPDATE',
@@ -131,6 +151,28 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
             } catch {}
           })
           .subscribe();
+
+        const { data: existingCandidates } = await supabase
+          .from('call_ice_candidates')
+          .select('user_id,candidate')
+          .eq('call_id', call.id)
+          .order('created_at', { ascending: true });
+
+        if (existingCandidates) {
+          for (const row of existingCandidates as { user_id: string; candidate: RTCIceCandidateInit }[]) {
+            if (row.user_id === call.caller) continue;
+            const key = row.candidate.candidate || JSON.stringify(row.candidate);
+            if (appliedCandidates.current.has(key)) continue;
+            if (!connection.remoteDescription) {
+              pendingCandidates.current.push(row.candidate);
+              continue;
+            }
+            try {
+              await connection.addIceCandidate(row.candidate);
+              appliedCandidates.current.add(key);
+            } catch {}
+          }
+        }
 
         const { data: current } = await supabase.from('calls').select('*').eq('id', call.id).single();
         const currentCall = current as Call;
