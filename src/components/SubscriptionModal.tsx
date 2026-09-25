@@ -29,7 +29,7 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
       user_id: user.id,
       plan: selectedPlan,
       amount: PLAN_PRICES[selectedPlan],
-      status: 'active',
+      status: 'pending',
       starts_at: new Date().toISOString(),
       expires_at: expires.toISOString(),
     });
