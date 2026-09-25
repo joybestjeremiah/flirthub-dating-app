@@ -16,8 +16,7 @@ interface Props {
 
 export default function CallModal({ match, callType, onClose }: Props) {
   const { user } = useAuth();
-  const [status, setStatus] = useState<'calling' | 'connected' | 'ended'>('calling');
-  const [duration, setDuration] = useState(0);
+  const [status, setStatus] = useState<'calling' | 'ended'>('calling');
   const [muted, setMuted] = useState(false);
   const [callId, setCallId] = useState<string | null>(null);
 
@@ -43,12 +42,6 @@ export default function CallModal({ match, callType, onClose }: Props) {
     startCall();
   }, [user, match.id, callType, onClose]);
 
-  useEffect(() => {
-    if (status !== 'connected') return;
-    const interval = setInterval(() => setDuration((d) => d + 1), 1000);
-    return () => clearInterval(interval);
-  }, [status]);
-
   const handleEnd = async () => {
     if (callId) {
       const { error } = await supabase
@@ -59,12 +52,6 @@ export default function CallModal({ match, callType, onClose }: Props) {
     }
     setStatus('ended');
     setTimeout(onClose, 1000);
-  };
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   };
 
   const other = match.otherProfile;
@@ -78,7 +65,6 @@ export default function CallModal({ match, callType, onClose }: Props) {
         <div className="text-white text-xl font-semibold mt-2">{other?.display_name}</div>
         <div className="text-white/50 text-sm mt-1">
           {status === 'calling' && 'Call request sent...'}
-          {status === 'connected' && formatTime(duration)}
           {status === 'ended' && 'Call ended'}
         </div>
       </div>
@@ -102,15 +88,9 @@ export default function CallModal({ match, callType, onClose }: Props) {
             Waiting for the other person to respond
           </div>
         )}
-        {status === 'calling' && false && (
-          <div className="mt-6 flex gap-2">
-            {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="w-2 h-2 rounded-full bg-white/40 animate-bounce"
-                style={{ animationDelay: `${i * 0.2}s` }}
-              />
-            ))}
+        {status === 'calling' && (
+          <div className="mt-6 text-center text-white/60 text-sm">
+            Waiting for the other person to respond
           </div>
         )}
       </div>
