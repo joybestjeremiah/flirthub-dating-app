@@ -58,8 +58,12 @@ export default function IncomingCall({ userId }: Props) {
       })
       .eq('id', call.id);
 
-    if (error) console.error('Failed to update incoming call', error);
-    close();
+    if (error) {
+      console.error('Failed to update incoming call', error);
+      return false;
+    }
+    if (status === 'rejected') close();
+    return true;
   };
 
   const isVideo = call.call_type === 'video';
@@ -86,7 +90,7 @@ export default function IncomingCall({ userId }: Props) {
           <button onClick={() => updateCall('rejected')} className="w-14 h-14 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center">
             <X className="w-6 h-6" />
           </button>
-          <button onClick={async () => { await updateCall('accepted'); setActive(true); }} className="w-14 h-14 rounded-full bg-green-500 text-white flex items-center justify-center">
+          <button onClick={async () => { const ok = await updateCall('accepted'); if (ok) setActive(true); }} className="w-14 h-14 rounded-full bg-green-500 text-white flex items-center justify-center">
             <Phone className="w-6 h-6" />
           </button>
         </div>
