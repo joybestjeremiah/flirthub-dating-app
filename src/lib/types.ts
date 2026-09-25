@@ -48,10 +48,6 @@ export interface Call {
   answer?: RTCSessionDescriptionInit | null;
   caller_ice?: RTCIceCandidateInit[];
   callee_ice?: RTCIceCandidateInit[];
-  offer?: RTCSessionDescriptionInit | null;
-  answer?: RTCSessionDescriptionInit | null;
-  caller_ice?: RTCIceCandidateInit[];
-  callee_ice?: RTCIceCandidateInit[];
 }
 
 export interface Room {
