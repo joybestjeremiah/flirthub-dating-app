@@ -212,7 +212,12 @@ function ChatView({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${match.id}` },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+          const incoming = payload.new as Message;
+          setMessages((prev) =>
+            prev.some((message) => message.id === incoming.id)
+              ? prev
+              : [...prev, incoming]
+          );
         }
       )
       .subscribe();
@@ -252,7 +257,12 @@ function ChatView({
       .select('*')
       .single();
 
-    if (data) setMessages((prev) => [...prev, data as Message]);
+    if (data) {
+      const sent = data as Message;
+      setMessages((prev) =>
+        prev.some((message) => message.id === sent.id) ? prev : [...prev, sent]
+      );
+    }
   };
 
   const other = match.otherProfile;
