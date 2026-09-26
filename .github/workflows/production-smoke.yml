@@ -34,8 +34,11 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Validate application
+        run: npm run lint && npm run typecheck && npm run build
+
       - name: Install Playwright test runner
-        run: npm install --no-save @playwright/test@latest
+        run: npm install --no-save @playwright/test@1.55.0
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
