@@ -319,11 +319,12 @@ function ChatView({
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${match.id}` },
         (payload) => {
           const incoming = payload.new as Message;
-          setMessages((prev) =>
-            prev.some((message) => message.id === incoming.id)
-              ? prev
-              : [...prev, incoming]
-          );
+          if (incoming.message_type === 'image' && incoming.media_path) {
+            supabase.storage.from('chat-media').createSignedUrl(incoming.media_path, 60 * 60).then(({ data }) => {
+              const hydrated = data?.signedUrl ? { ...incoming, media_url: data.signedUrl } : incoming;
+              setMessages((prev) => prev.some((message) => message.id === hydrated.id) ? prev : [...prev, hydrated]);
+            });
+          } else setMessages((prev) => prev.some((message) => message.id === incoming.id) ? prev : [...prev, incoming]);
         }
       )
       .on(
@@ -347,6 +348,15 @@ function ChatView({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
+  const hydrateMediaUrls = async (items: Message[]) => {
+    const paths = items.filter(m => m.message_type === 'image' && m.media_path).map(m => m.media_path as string);
+    if (!paths.length) return items;
+    const { data } = await supabase.storage.from('chat-media').createSignedUrls(paths, 60 * 60);
+    const urlMap = new Map<string, string>();
+    (data || []).forEach((item, index) => { if (item.signedUrl) urlMap.set(paths[index], item.signedUrl); });
+    return items.map(m => m.media_path && urlMap.has(m.media_path) ? { ...m, media_url: urlMap.get(m.media_path) || null } : m);
+  };
+
   const markIncomingAsRead = async (items: Message[]) => {
     if (!user) return;
     const unreadIds = items.filter((m) => m.sender !== user.id && !m.read).map((m) => m.id);
@@ -365,7 +375,7 @@ function ChatView({
       console.error('Failed to load messages', error);
       setMessages([]);
     } else {
-      const items = (data || []) as Message[];
+      const items = await hydrateMediaUrls((data || []) as Message[]);
       setMessages(items);
       await markIncomingAsRead(items);
     }
@@ -394,8 +404,7 @@ function ChatView({
     const path = `${match.id}/${user.id}/${crypto.randomUUID()}.${ext}`;
     const { error: uploadError } = await supabase.storage.from('chat-media').upload(path, selectedImage, { contentType: selectedImage.type, upsert: false });
     if (uploadError) { console.error(uploadError); alert('Could not upload this image.'); setUploadingImage(false); return; }
-    const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
-    const { data, error } = await supabase.from('messages').insert({ match_id: match.id, sender: user.id, content: '', message_type: 'image', media_url: urlData.publicUrl }).select('*').single();
+    const { data, error } = await supabase.from('messages').insert({ match_id: match.id, sender: user.id, content: '', message_type: 'image', media_url: null, media_path: path }).select('*').single();
     if (error) { console.error(error); await supabase.storage.from('chat-media').remove([path]); alert('Could not send this image.'); } else if (data) setMessages(prev => prev.some(m => m.id === data.id) ? prev : [...prev, data as Message]);
     setSelectedImage(null); setUploadingImage(false);
   };
