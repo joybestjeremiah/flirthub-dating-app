@@ -76,20 +76,21 @@ function App() {
     if (params.get('payment') !== 'subscription') return;
     const status = params.get('status');
     const transactionId = params.get('transaction_id');
-    const txRef = params.get('tx_ref') || sessionStorage.getItem('flirthub_subscription_tx_ref');
+    const reference = params.get('reference');
+    const txRef = params.get('tx_ref') || reference || sessionStorage.getItem('flirthub_subscription_tx_ref');
     if (status === 'cancelled' || status === 'failed') {
       setPaymentMessage('Payment was not completed. Your Premium access was not activated.');
       sessionStorage.removeItem('flirthub_subscription_tx_ref');
       return;
     }
-    if (!transactionId || !txRef) {
+    if (!txRef) {
       setPaymentMessage('Payment returned without a valid transaction reference.');
       return;
     }
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase.functions.invoke('verify-subscription-payment', {
-        body: { tx_ref: txRef, transaction_id: transactionId },
+        body: { tx_ref: txRef, transaction_id: transactionId || undefined },
       });
       if (cancelled) return;
       if (error || !data?.success) {
