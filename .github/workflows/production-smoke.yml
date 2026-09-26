@@ -1,0 +1,48 @@
+name: FlirtHub Production Smoke Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 */6 * * *'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SMOKE_BASE_URL: https://flirthub-dating-app.vercel.app
+      SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+      SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+      SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
+      SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run production smoke tests
+        run: npx playwright test tests/smoke/production.spec.js --reporter=line
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flirthub-smoke-report
+          path: test-results/
+          retention-days: 7
