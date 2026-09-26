@@ -13,6 +13,8 @@ export default function DiscoverPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<Profile | null>(null);
+  const [maxAge, setMaxAge] = useState(99);
+  const [cityFilter, setCityFilter] = useState('');
 
   useEffect(() => {
     loadProfiles();
@@ -44,9 +46,13 @@ export default function DiscoverPage() {
     setLikedIds(likedSet);
     setPassedIds(passedSet);
 
-    const filtered = (profileData || []).filter(
-      (p) => !likedSet.has((p as Profile).id) && !passedSet.has((p as Profile).id)
-    ) as Profile[];
+    const me = (await supabase.from('profiles').select('gender, interested_in').eq('id', user.id).maybeSingle()).data as Pick<Profile, 'gender' | 'interested_in'> | null;
+    const filtered = (profileData || []).filter((p) => {
+      const candidate = p as Profile;
+      const genderMatches = !me?.interested_in || me.interested_in === 'all' || me.interested_in === candidate.gender;
+      const candidateAcceptsMe = !candidate.interested_in || candidate.interested_in === 'all' || candidate.interested_in === me?.gender;
+      return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id);
+    }) as Profile[];
     setProfiles(filtered);
     setLoading(false);
   };
@@ -131,7 +137,11 @@ export default function DiscoverPage() {
     );
   }
 
-  const current = profiles[currentIdx];
+  const visibleProfiles = profiles.filter((p) =>
+    (p.age == null || p.age <= maxAge) &&
+    (!cityFilter.trim() || (p.city ?? '').toLowerCase().includes(cityFilter.trim().toLowerCase()))
+  );
+  const current = visibleProfiles[currentIdx];
 
   if (!current) {
     return (
@@ -153,6 +163,22 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6">
+      <div className="mb-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div><div className="font-semibold text-gray-900">Discovery filters</div><div className="text-xs text-gray-500">Matches respect your profile preferences</div></div>
+          <Sparkles className="w-5 h-5 text-rose-400" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-gray-500">Maximum age
+            <select value={maxAge} onChange={(e) => { setMaxAge(Number(e.target.value)); setCurrentIdx(0); }} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 bg-white">
+              {[25,30,35,40,45,50,60,70,99].map((age) => <option key={age} value={age}>{age === 99 ? 'Any age' : age}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-gray-500">City
+            <input value={cityFilter} onChange={(e) => { setCityFilter(e.target.value); setCurrentIdx(0); }} placeholder="Any city" className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-rose-400" />
+          </label>
+        </div>
+      </div>
       {matchedProfile && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-white rounded-3xl p-7 text-center shadow-2xl">
@@ -237,7 +263,7 @@ export default function DiscoverPage() {
       </div>
 
       <p className="text-center text-sm text-gray-400 mt-4">
-        {profiles.length - currentIdx - 1} more profiles to discover
+        {Math.max(0, visibleProfiles.length - currentIdx - 1)} more profiles to discover
       </p>
     </div>
   );
