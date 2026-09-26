@@ -181,6 +181,7 @@ export default function DiscoverPage() {
     (!cityFilter.trim() || (p.city ?? '').toLowerCase().includes(cityFilter.trim().toLowerCase()))
   );
   const current = visibleProfiles[currentIdx];
+  const currentDistance = (current as Profile & { distance_km?: number } | undefined)?.distance_km;
 
   if (!current) {
     return (
@@ -263,7 +264,7 @@ export default function DiscoverPage() {
                 {current.city}
               </div>
             )}
-            {(current as Profile & { distance_km?: number }).distance_km != null && <div className="text-white/70 text-xs mt-1">{Math.round((current as Profile & { distance_km?: number }).distance_km! * 10) / 10} km away</div>}
+            {currentDistance != null && <div className="text-white/70 text-xs mt-1">{Math.round(currentDistance * 10) / 10} km away</div>}
             {current.bio && (
               <p className="text-white/80 text-sm mt-2 line-clamp-3">{current.bio}</p>
             )}
