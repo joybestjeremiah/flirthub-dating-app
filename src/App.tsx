@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Heart, MessageCircle, Users, Crown, LogOut, User, Loader2, Shield, Wallet } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthPage from '@/pages/AuthPage';
+import PasswordResetPage from '@/pages/PasswordResetPage';
 import ProfileSetup from '@/pages/ProfileSetup';
 import DiscoverPage from '@/pages/DiscoverPage';
 import MatchesPage from '@/pages/MatchesPage';
@@ -11,10 +12,10 @@ import SubscriptionModal from '@/components/SubscriptionModal';
 import WalletModal from '@/components/WalletModal';
 import IncomingCall from '@/components/IncomingCall';
 
-type Route = '/' | '/profile-setup' | '/discover' | '/matches' | '/rooms' | '/admin';
+type Route = '/' | '/reset-password' | '/profile-setup' | '/discover' | '/matches' | '/rooms' | '/admin';
 function getRoute(): Route {
   const path = window.location.pathname;
-  if (path === '/profile-setup' || path === '/discover' || path === '/matches' || path === '/rooms' || path === '/admin') return path;
+  if (path === '/reset-password' || path === '/profile-setup' || path === '/discover' || path === '/matches' || path === '/rooms' || path === '/admin') return path;
   return '/';
 }
 export function navigate(path: Route) {
@@ -33,8 +34,8 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   useEffect(() => {
     if (loading) return;
-    if (!user) { if (route !== '/') navigate('/'); return; }
-    if (!profile) { if (route !== '/profile-setup') navigate('/profile-setup'); return; }
+    if (!user) { if (route !== '/' && route !== '/reset-password') navigate('/'); return; }
+    if (!profile) { if (route !== '/profile-setup' && route !== '/reset-password') navigate('/profile-setup'); return; }
     if (route === '/' || route === '/profile-setup') navigate('/discover');
     if (route === '/admin' && !isAdmin) navigate('/discover');
   }, [loading, user, profile, isAdmin, route]);
@@ -42,7 +43,8 @@ function App() {
     if (window.location.search.includes('payment=callback')) setShowWalletModal(true);
   }, []);
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50"><Loader2 className="w-10 h-10 text-rose-500 animate-spin" /></div>;
-  if (!user) return <AuthPage />;
+  if (!user && route !== '/reset-password') return <AuthPage />;
+  if (route === '/reset-password') return <PasswordResetPage />;
   if (!profile) return <ProfileSetup />;
   if (showProfile) return <ProfileSetup />;
   if (route === '/admin') return <AdminPanel onBack={() => navigate('/discover')} />;
