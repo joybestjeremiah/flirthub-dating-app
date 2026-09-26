@@ -19,6 +19,9 @@ export default function DiscoverPage() {
   const [reportReason, setReportReason] = useState('');
   const [profilePhotos, setProfilePhotos] = useState<string[]>([]);
   const [showProfile, setShowProfile] = useState(false);
+  const [maxDistanceKm, setMaxDistanceKm] = useState(50);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadProfiles();
@@ -53,14 +56,23 @@ export default function DiscoverPage() {
     setLikedIds(likedSet);
     setPassedIds(passedSet);
 
-    const me = (await supabase.from('profiles').select('gender, interested_in') .eq('id', user.id).maybeSingle()).data as Pick<Profile, 'gender' | 'interested_in'> | null;
+    const { data: meData } = await supabase.from('profiles').select('gender, interested_in, latitude, longitude, max_distance_km').eq('id', user.id).maybeSingle();
+    const me = meData as Pick<Profile, 'gender', 'interested_in'> & { latitude?: number | null; longitude?: number | null; max_distance_km?: number } | null;
+    setMaxDistanceKm(me?.max_distance_km ?? 50);
+    setLocationEnabled(me?.latitude != null && me?.longitude != null);
+    let distanceById = new Map<string, number>();
+    if (me?.latitude != null && me?.longitude != null) {
+      const { data: nearby } = await supabase.rpc('nearby_profiles', { p_latitude: me.latitude, p_longitude: me.longitude, p_max_distance_km: me.max_distance_km ?? 50 });
+      distanceById = new Map((nearby ?? []).map((row: { id: string; distance_km: number }) => [row.id, row.distance_km]));
+    }
     const filtered = (profileData || []).filter((p) => {
       const candidate = p as Profile;
       const genderMatches = !me?.interested_in || me.interested_in === 'all' || me.interested_in === candidate.gender;
       const candidateAcceptsMe = !candidate.interested_in || candidate.interested_in === 'all' || candidate.interested_in === me?.gender;
-      return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id) && !blockedSet.has(candidate.id);
+      return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id) && !blockedSet.has(candidate.id) && (!locationEnabled || distanceById.has(candidate.id));
     }) as Profile[];
-    setProfiles(filtered);
+    setProfiles(filtered.map((p) => ({ ...p, distance_km: distanceById.get(p.id) } as Profile & { distance_km?: number })));
+    setLocationMessage(locationEnabled ? null : 'Enable location in your profile to match by distance. City matching remains available.');
     setLoading(false);
   };
 
@@ -195,7 +207,7 @@ export default function DiscoverPage() {
           <div><div className="font-semibold text-gray-900">Discovery filters</div><div className="text-xs text-gray-500">Matches respect your profile preferences</div></div>
           <Sparkles className="w-5 h-5 text-rose-400" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="mb-3 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2 text-xs text-rose-700">{locationEnabled ? `Distance matching: within ${maxDistanceKm} km` : locationMessage}</div><div className="grid grid-cols-2 gap-3">
           <label className="text-xs text-gray-500">Maximum age
             <select value={maxAge} onChange={(e) => { setMaxAge(Number(e.target.value)); setCurrentIdx(0); }} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 bg-white">
               {[25,30,35,40,45,50,60,70,99].map((age) => <option key={age} value={age}>{age === 99 ? 'Any age' : age}</option>)}
@@ -251,6 +263,7 @@ export default function DiscoverPage() {
                 {current.city}
               </div>
             )}
+            {(current as Profile & { distance_km?: number }).distance_km != null && <div className="text-white/70 text-xs mt-1">{Math.round((current as Profile & { distance_km?: number }).distance_km! * 10) / 10} km away</div>}
             {current.bio && (
               <p className="text-white/80 text-sm mt-2 line-clamp-3">{current.bio}</p>
             )}
