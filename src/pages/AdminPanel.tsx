@@ -305,7 +305,7 @@ export default function AdminPanel({ onBack }: Props) {
     const created = new Date(s.created_at ?? s.starts_at ?? s.expires_at).getTime();
     if (created < cutoff) return false;
     const q = paymentSearch.trim().toLowerCase();
-    const matchesSearch = !q || [s.tx_ref, s.flutterwave_transaction_id, s.profile?.display_name, s.profile?.city].some(v => String(v ?? '').toLowerCase().includes(q));
+    const matchesSearch = !q || [s.tx_ref, s.paystack_transaction_id, s.profile?.display_name, s.profile?.city].some(v => String(v ?? '').toLowerCase().includes(q));
     const actual = s.status === 'active' && new Date(s.expires_at) <= new Date() ? 'expired' : s.status;
     const matchesStatus = paymentStatus === 'all' || (paymentStatus === 'successful' ? (actual === 'active' || actual === 'expired') : actual === paymentStatus);
     return matchesSearch && matchesStatus;
@@ -320,7 +320,7 @@ export default function AdminPanel({ onBack }: Props) {
   })();
 
   const exportPaymentsCsv = () => {
-    const header = ['User','Plan','Amount NGN','Status','Tx Ref','Flutterwave Transaction ID','Paid At','Created At'];
+    const header = ['User','Plan','Amount NGN','Status','Tx Ref','Paystack Transaction ID','Paid At','Created At'];
     const rows = paymentRows.map(s => [s.profile?.display_name || '', s.plan, Number(s.amount), s.status, s.tx_ref || '', s.flutterwave_transaction_id || '', s.paid_at || '', s.created_at || '']);
     const csv = [header, ...rows].map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
     const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
