@@ -20,11 +20,12 @@ export default function WalletModal({ onClose }: WalletModalProps) {
     load();
     const params = new URLSearchParams(window.location.search);
     const txRef = params.get('tx_ref');
+    const reference = params.get('reference') || txRef;
     const transactionId = params.get('transaction_id');
     const status = params.get('status');
     if (txRef && transactionId && status === 'successful') {
       setLoading(true);
-      supabase.functions.invoke('verify-wallet-topup', { body: { tx_ref: txRef, transaction_id: transactionId } })
+      supabase.functions.invoke('verify-wallet-topup', { body: { reference, transaction_id: transactionId } })
         .then(({ data, error }) => {
           if (error) throw error;
           if (!data?.success) throw new Error(data?.error ?? 'Payment could not be verified.');
@@ -65,8 +66,8 @@ export default function WalletModal({ onClose }: WalletModalProps) {
           <label className="block text-sm font-medium text-gray-700">Amount to fund</label>
           <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="e.g. 5000" className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-rose-200" />
           {message && <p className="text-sm text-red-600">{message}</p>}
-          <button onClick={fund} disabled={loading} className="w-full rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold py-3 disabled:opacity-60">{loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Continue to Flutterwave'}</button>
-          <p className="text-xs text-gray-400 text-center">Payments are processed securely by Flutterwave.</p>
+          <button onClick={fund} disabled={loading} className="w-full rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold py-3 disabled:opacity-60">{loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Continue to Paystack'}</button>
+          <p className="text-xs text-gray-400 text-center">Payments are processed securely by Paystack.</p>
         </div>
       </div>
     </div>
