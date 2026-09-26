@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck, Gift, HeartOff, ImagePlus, X } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck, Gift, HeartOff, ImagePlus, X, Mic, Square, Play } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Message, Match } from '@/lib/types';
@@ -293,6 +293,10 @@ function ChatView({
   const [input, setInput] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -318,7 +322,7 @@ function ChatView({
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${match.id}` },
         (payload) => {
           const incoming = payload.new as Message;
-          if (incoming.message_type === 'image' && incoming.media_path) {
+          if ((incoming.message_type === 'image' || incoming.message_type === 'audio') && incoming.media_path) {
             supabase.storage.from('chat-media').createSignedUrl(incoming.media_path, 60 * 60).then(({ data }) => {
               const hydrated = data?.signedUrl ? { ...incoming, media_url: data.signedUrl } : incoming;
               setMessages((prev) => prev.some((message) => message.id === hydrated.id) ? prev : [...prev, hydrated]);
@@ -348,7 +352,7 @@ function ChatView({
   }, [messages]);
 
   const hydrateMediaUrls = async (items: Message[]) => {
-    const paths = items.filter(m => m.message_type === 'image' && m.media_path).map(m => m.media_path as string);
+    const paths = items.filter(m => (m.message_type === 'image' || m.message_type === 'audio') && m.media_path).map(m => m.media_path as string);
     if (!paths.length) return items;
     const { data } = await supabase.storage.from('chat-media').createSignedUrls(paths, 60 * 60);
     const urlMap = new Map<string, string>();
@@ -392,6 +396,31 @@ function ChatView({
     publishTyping(Boolean(value.trim()));
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => publishTyping(false), 1200);
+  };
+
+  const uploadAudio = async (blob: Blob) => {
+    if (!user || uploadingAudio) return;
+    setUploadingAudio(true);
+    const path = `${match.id}/${user.id}/${crypto.randomUUID()}.webm`;
+    const { error: uploadError } = await supabase.storage.from('chat-media').upload(path, blob, { contentType: 'audio/webm', upsert: false });
+    if (uploadError) { console.error(uploadError); alert('Could not upload the voice message.'); setUploadingAudio(false); return; }
+    const { data, error } = await supabase.from('messages').insert({ match_id: match.id, sender: user.id, content: '', message_type: 'audio', media_url: null, media_path: path }).select('*').single();
+    if (error) { await supabase.storage.from('chat-media').remove([path]); alert('Could not send the voice message.'); }
+    else if (data) { const signed = await supabase.storage.from('chat-media').createSignedUrl(path, 60 * 60); setMessages(prev => prev.some(m => m.id === data.id) ? prev : [...prev, { ...(data as Message), media_url: signed.data?.signedUrl || null }]); }
+    setUploadingAudio(false);
+  };
+
+  const toggleRecording = async () => {
+    if (recording) { mediaRecorderRef.current?.stop(); setRecording(false); return; }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') { alert('Voice recording is not supported by this browser.'); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) audioChunksRef.current.push(event.data); };
+      recorder.onstop = async () => { stream.getTracks().forEach(track => track.stop()); const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); if (blob.size <= 10 * 1024 * 1024) await uploadAudio(blob); else alert('Voice messages must be 10 MB or smaller.'); };
+      mediaRecorderRef.current = recorder; recorder.start(); setRecording(true);
+    } catch { alert('Microphone permission is required to record a voice message.'); }
   };
 
   const handleSendImage = async () => {
@@ -496,7 +525,7 @@ function ChatView({
                       : 'bg-white text-gray-800 rounded-bl-md shadow-sm border border-gray-100'
                   }`}
                 >
-                  {msg.message_type === 'image' && msg.media_url ? <img src={msg.media_url} alt="Shared image" className="rounded-xl max-h-72 w-auto object-cover" loading="lazy" /> : <div>{msg.content}</div>}
+                  {msg.message_type === 'image' && msg.media_url ? <img src={msg.media_url} alt="Shared image" className="rounded-xl max-h-72 w-auto object-cover" loading="lazy" /> : msg.message_type === 'audio' && msg.media_url ? <audio src={msg.media_url} controls className="max-w-full" /> : <div>{msg.content}</div>}
                   {isMine && (
                     <div className="mt-1 flex justify-end">
                       {msg.read ? <CheckCheck className="w-3.5 h-3.5 text-white/80" /> : <Check className="w-3.5 h-3.5 text-white/70" />}
@@ -513,6 +542,7 @@ function ChatView({
       {selectedImage && <div className="px-4 py-2 bg-white border-t border-gray-100 flex items-center gap-3"><img src={URL.createObjectURL(selectedImage)} alt="Preview" className="w-14 h-14 rounded-lg object-cover" /><span className="text-xs text-gray-500 flex-1 truncate">{selectedImage.name}</span><button type="button" onClick={() => setSelectedImage(null)}><X className="w-4 h-4 text-gray-500" /></button></div>}
       <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white flex items-center gap-2">
         <label className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center cursor-pointer hover:border-rose-400 text-gray-500"><ImagePlus className="w-5 h-5" /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploadingImage} onChange={(e) => setSelectedImage(e.target.files?.[0] || null)} /></label>
+        <button type="button" onClick={toggleRecording} disabled={uploadingAudio || uploadingImage} className={`w-10 h-10 rounded-full border flex items-center justify-center ${recording ? 'border-red-400 text-red-500 bg-red-50' : 'border-gray-200 text-gray-500 hover:border-rose-400'}`} title={recording ? 'Stop recording' : 'Record voice message'}>{recording ? <Square className="w-4 h-4" /> : <Mic className="w-5 h-5" />}</button>
         <input
           type="text"
           value={input}
@@ -522,7 +552,7 @@ function ChatView({
         />
         <button
           type="submit"
-          disabled={(!input.trim() && !selectedImage) || uploadingImage}
+          disabled={(!input.trim() && !selectedImage) || uploadingImage || uploadingAudio || recording}
           className="w-10 h-10 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 text-white flex items-center justify-center disabled:opacity-50 hover:scale-105 active:scale-95 transition-transform"
         >
           {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
