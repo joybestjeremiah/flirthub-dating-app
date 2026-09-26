@@ -36,7 +36,7 @@ interface AdminUser extends Profile {
   subscription?: Subscription | null;
 }
 
-type AdminTab = 'overview' | 'users' | 'subscriptions' | 'rooms';
+type AdminTab = 'overview' | 'users' | 'subscriptions' | 'rooms' | 'reports';
 
 interface Props {
   onBack: () => void;
@@ -49,6 +49,7 @@ export default function AdminPanel({ onBack }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [subscriptions, setSubscriptions] = useState<(Subscription & { profile?: Profile })[]>([]);
   const [rooms, setRooms] = useState<(Room & { ownerProfile?: Profile; memberCount: number })[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -61,7 +62,7 @@ export default function AdminPanel({ onBack }: Props) {
 
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadStats(), loadUsers(), loadSubscriptions(), loadRooms()]);
+    await Promise.all([loadStats(), loadUsers(), loadSubscriptions(), loadRooms(), loadReports()]);
     setLoading(false);
   };
 
@@ -137,6 +138,28 @@ export default function AdminPanel({ onBack }: Props) {
     );
 
     setSubscriptions(enriched);
+  };
+
+  const loadReports = async () => {
+    const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(100);
+    setReports(data || []);
+  };
+
+  const moderateUser = async (userId: string, status: 'active' | 'suspended' | 'banned') => {
+    setActionBusy(true); setActionError(null);
+    const { error } = await supabase.from('profiles').update({ moderation_status: status, is_visible: status === 'active' }).eq('id', userId);
+    setActionBusy(false);
+    if (error) { setActionError(error.message); return; }
+    await loadUsers();
+    setSelectedUser(null);
+  };
+
+  const updateReport = async (reportId: string, status: 'reviewed' | 'resolved' | 'dismissed') => {
+    setActionBusy(true); setActionError(null);
+    const { error } = await supabase.from('reports').update({ status }).eq('id', reportId);
+    setActionBusy(false);
+    if (error) { setActionError(error.message); return; }
+    await loadReports();
   };
 
   const loadRooms = async () => {
@@ -282,6 +305,7 @@ export default function AdminPanel({ onBack }: Props) {
             { key: 'users', label: 'Users', icon: Users },
             { key: 'subscriptions', label: 'Subscriptions', icon: Crown },
             { key: 'rooms', label: 'Rooms', icon: DoorOpen },
+            { key: 'reports', label: 'Reports', icon: Shield },
           ] as { key: AdminTab; label: string; icon: typeof Users }[]).map((t) => (
             <button
               key={t.key}
@@ -377,6 +401,11 @@ export default function AdminPanel({ onBack }: Props) {
               </div>
             </div>
           </div>
+        )}
+
+
+        {tab === 'reports' && (
+          <div><div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-gray-900">Safety Reports</h2><button onClick={loadReports} className="text-sm text-rose-600 font-semibold">Refresh</button></div><div className="space-y-3">{reports.length === 0 ? <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-sm text-gray-400">No reports.</div> : reports.map((r) => <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-4"><div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-gray-900">{r.reason}</div><div className="text-xs text-gray-500 mt-1">{r.details || 'No additional details'}</div><div className="text-[11px] text-gray-400 mt-2">Reported user: {r.reported} · {new Date(r.created_at).toLocaleString()}</div></div><span className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600">{r.status}</span></div><div className="flex flex-wrap gap-2 mt-3"><button onClick={() => updateReport(r.id,'reviewed')} className="px-3 py-1.5 rounded-lg bg-gray-100 text-xs font-semibold">Mark reviewed</button><button onClick={() => updateReport(r.id,'resolved')} className="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-semibold">Resolve</button><button onClick={() => updateReport(r.id,'dismissed')} className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold">Dismiss</button><button onClick={() => moderateUser(r.reported,'suspended')} className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-semibold">Suspend user</button><button onClick={() => moderateUser(r.reported,'banned')} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-semibold">Ban user</button></div></div>)}</div></div>
         )}
 
         {/* Users */}
