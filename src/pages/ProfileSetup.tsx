@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { navigate } from '@/App';
 
 export default function ProfileSetup() {
-  const { user, profile, refreshProfile, signOut } = useAuth();
+  const { user, profile, refreshProfile, signOut, deleteAccount } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [age, setAge] = useState(profile?.age?.toString() ?? '');
@@ -18,6 +18,7 @@ export default function ProfileSetup() {
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -93,6 +94,14 @@ export default function ProfileSetup() {
     navigate('/discover');
   };
 
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Delete your FlirtHub account permanently? This cannot be undone.')) return;
+    setDeleting(true); setError(null);
+    const { error } = await deleteAccount();
+    setDeleting(false);
+    if (error) setError(error);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50 py-10 px-4">
       <div className="max-w-lg mx-auto">
@@ -136,6 +145,7 @@ export default function ProfileSetup() {
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />} {profile ? 'Save Changes' : 'Save Profile'}
           </button>
         </form>
+        {profile && <button onClick={handleDeleteAccount} disabled={deleting} className="w-full mt-4 py-3 rounded-xl border border-red-200 text-red-600 font-semibold hover:bg-red-50 disabled:opacity-60 flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" />{deleting ? 'Deleting account…' : 'Delete my account'}</button>}
       </div>
     </div>
   );
