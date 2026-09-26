@@ -57,7 +57,7 @@ export default function DiscoverPage() {
     setPassedIds(passedSet);
 
     const { data: meData } = await supabase.from('profiles').select('gender, interested_in, latitude, longitude, max_distance_km').eq('id', user.id).maybeSingle();
-    const me = meData as Pick<Profile, 'gender', 'interested_in'> & { latitude?: number | null; longitude?: number | null; max_distance_km?: number } | null;
+    const me = meData as Pick<Profile, 'gender' | 'interested_in'> & { latitude?: number | null; longitude?: number | null; max_distance_km?: number } | null;
     setMaxDistanceKm(me?.max_distance_km ?? 50);
     setLocationEnabled(me?.latitude != null && me?.longitude != null);
     let distanceById = new Map<string, number>();
