@@ -10,15 +10,16 @@ import MatchesPage from '@/pages/MatchesPage';
 import RoomsPage from '@/pages/RoomsPage';
 import SubscriptionPage from '@/pages/SubscriptionPage';
 import AdminPanel from '@/pages/AdminPanel';
+import HostEarningsPage from '@/pages/HostEarningsPage';
 import SubscriptionModal from '@/components/SubscriptionModal';
 import WalletModal from '@/components/WalletModal';
 import IncomingCall from '@/components/IncomingCall';
 import type { Notification } from '@/lib/types';
 
-type Route = '/' | '/reset-password' | '/profile-setup' | '/discover' | '/matches' | '/rooms' | '/admin' | '/subscription';
+type Route = '/' | '/reset-password' | '/profile-setup' | '/discover' | '/matches' | '/rooms' | '/admin' | '/subscription' | '/earnings';
 function getRoute(): Route {
   const path = window.location.pathname;
-  if (path === '/reset-password' || path === '/profile-setup' || path === '/discover' || path === '/matches' || path === '/rooms' || path === '/admin' || path === '/subscription') return path;
+  if (path === '/reset-password' || path === '/profile-setup' || path === '/discover' || path === '/matches' || path === '/rooms' || path === '/admin' || path === '/subscription' || path === '/earnings') return path;
   return '/';
 }
 export function navigate(path: Route) {
@@ -68,6 +69,7 @@ function App() {
     if (!profile) { if (route !== '/profile-setup' && route !== '/reset-password') navigate('/profile-setup'); return; }
     if (route === '/' || route === '/profile-setup') navigate('/discover');
     if (route === '/admin' && !isAdmin) navigate('/discover');
+    if (route === '/earnings' && !user) navigate('/discover');
   }, [loading, user, profile, isAdmin, route]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -107,6 +109,7 @@ function App() {
   if (showProfile) return <ProfileSetup />;
   if (route === '/admin') return <AdminPanel onBack={() => navigate('/discover')} />;
   if (route === '/subscription') return <SubscriptionPage />;
+  if (route === '/earnings') return <HostEarningsPage onBack={() => navigate('/discover')} />;
   const activeTab = route === '/matches' ? 'matches' : route === '/rooms' ? 'rooms' : 'discover';
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50">
@@ -118,6 +121,7 @@ function App() {
             <button onClick={() => setShowWalletModal(true)} className="flex items-center gap-1 bg-gray-50 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full"><Wallet className="w-3.5 h-3.5" /> Wallet</button>
             {hasActiveSubscription ? <button onClick={() => navigate('/subscription')} className="flex items-center gap-1 bg-amber-50 text-amber-700 text-xs font-semibold px-3 py-1.5 rounded-full"><Crown className="w-3.5 h-3.5" /> Premium</button> : <button onClick={() => setShowSubModal(true)} className="flex items-center gap-1.5 bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full"><Crown className="w-3.5 h-3.5" /> Upgrade</button>}
             {isAdmin && <button onClick={() => navigate('/admin')} className="p-2 text-gray-500 hover:text-rose-500" title="Admin Panel"><Shield className="w-5 h-5" /></button>}
+            <button onClick={() => navigate('/earnings')} className="p-2 text-gray-500 hover:text-rose-500" title="Host Earnings"><Wallet className="w-5 h-5" /></button>
             <button onClick={() => setShowProfile(true)} className="w-9 h-9 rounded-full overflow-hidden bg-rose-100 flex items-center justify-center border border-gray-200">{profile.photo_url ? <img src={profile.photo_url} alt={profile.display_name} className="w-full h-full object-cover" /> : <User className="w-5 h-5 text-rose-400" />}</button>
             <button onClick={signOut} className="p-2 text-gray-400 hover:text-gray-600" title="Sign out"><LogOut className="w-5 h-5" /></button>
           </div>
