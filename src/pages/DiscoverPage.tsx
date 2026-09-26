@@ -17,6 +17,8 @@ export default function DiscoverPage() {
   const [cityFilter, setCityFilter] = useState('');
   const [showSafety, setShowSafety] = useState(false);
   const [reportReason, setReportReason] = useState('');
+  const [profilePhotos, setProfilePhotos] = useState<string[]>([]);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     loadProfiles();
@@ -30,13 +32,15 @@ export default function DiscoverPage() {
       { data: profileData, error: profileError },
       { data: likesData, error: likesError },
       { data: passesData, error: passesError },
+      { data: blocksData, error: blocksError },
     ] = await Promise.all([
       supabase.from('profiles').select('*').neq('id', user.id),
       supabase.from('likes').select('to_user').eq('from_user', user.id),
       supabase.from('passes').select('to_user').eq('from_user', user.id),
+      supabase.from('blocks').select('blocked').eq('blocker', user.id),
     ]);
 
-    if (profileError || likesError || passesError) {
+    if (profileError || likesError || passesError || blocksError) {
       console.error('Failed to load discovery data', profileError ?? likesError);
       setProfiles([]);
       setLoading(false);
@@ -45,6 +49,7 @@ export default function DiscoverPage() {
 
     const likedSet = new Set((likesData || []).map((l: { to_user: string }) => l.to_user));
     const passedSet = new Set((passesData || []).map((p: { to_user: string }) => p.to_user));
+    const blockedSet = new Set((blocksData || []).map((b: { blocked: string }) => b.blocked));
     setLikedIds(likedSet);
     setPassedIds(passedSet);
 
@@ -53,7 +58,7 @@ export default function DiscoverPage() {
       const candidate = p as Profile;
       const genderMatches = !me?.interested_in || me.interested_in === 'all' || me.interested_in === candidate.gender;
       const candidateAcceptsMe = !candidate.interested_in || candidate.interested_in === 'all' || candidate.interested_in === me?.gender;
-      return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id);
+      return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id) && !blockedSet.has(candidate.id);
     }) as Profile[];
     setProfiles(filtered);
     setLoading(false);
@@ -109,12 +114,19 @@ export default function DiscoverPage() {
     setActionLoading(false);
   };
 
+  const openProfile = async () => {
+    if (!current) return;
+    const { data } = await supabase.from('profile_photos').select('photo_url').eq('user_id', current.id).order('sort_order', { ascending: true });
+    setProfilePhotos((data || []).map((p: { photo_url: string }) => p.photo_url));
+    setShowProfile(true);
+  };
+
   const handleSafetyAction = async (action: 'block' | 'report') => {
     if (!user || !current) return;
     if (action === 'block') {
       const { error } = await supabase.from('blocks').insert({ blocker: user.id, blocked: current.id });
       if (error) { console.error(error); return; }
-      setShowSafety(false); setCurrentIdx((prev) => prev + 1); return;
+      setShowSafety(false); setProfilePhotos([]); setCurrentIdx((prev) => prev + 1); return;
     }
     if (!reportReason) return;
     const { error } = await supabase.from('reports').insert({ reporter: user.id, reported: current.id, reason: reportReason });
@@ -244,7 +256,7 @@ export default function DiscoverPage() {
             )}
           </div>
 
-          <div className="absolute top-4 left-4 z-10"><button onClick={() => setShowSafety(true)} className="px-3 py-1.5 rounded-full bg-black/50 text-white text-xs backdrop-blur">••• Safety</button></div>\n          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 left-4 z-10"><button onClick={openProfile} className="px-3 py-1.5 rounded-full bg-black/50 text-white text-xs backdrop-blur">View profile</button></div>\n          <div className="absolute top-4 right-4">
             {current.online ? (
               <span className="flex items-center gap-1.5 bg-green-500/90 text-white text-xs font-medium px-3 py-1 rounded-full backdrop-blur">
                 <span className="w-2 h-2 bg-white rounded-full" />
@@ -258,6 +270,8 @@ export default function DiscoverPage() {
           </div>
         </div>
       </div>
+
+      {showProfile && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-5"><div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">{current.display_name}'s profile</h2><button onClick={() => setShowProfile(false)} className="text-gray-500">✕</button></div><div className="grid grid-cols-2 gap-2">{(profilePhotos.length ? profilePhotos : (current.photo_url ? [current.photo_url] : [])).map((url) => <img key={url} src={url} alt={current.display_name} className="w-full aspect-square object-cover rounded-2xl" />)}</div><div className="mt-4"><div className="text-lg font-semibold">{current.display_name}{current.age ? `, ${current.age}` : ''}</div>{current.city && <div className="text-sm text-gray-500 mt-1">{current.city}</div>}{current.bio && <p className="text-gray-700 mt-3 whitespace-pre-wrap">{current.bio}</p>}</div><button onClick={() => { setShowProfile(false); setShowSafety(true); }} className="w-full mt-5 py-3 rounded-xl border border-gray-200 text-gray-700">Safety options</button></div></div>}
 
       <div className="flex items-center justify-center gap-6 mt-6">
         <button
