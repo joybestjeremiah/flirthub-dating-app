@@ -12,6 +12,24 @@ export interface Profile {
   is_admin: boolean;
   created_at: string;
   updated_at: string;
+  latitude: number | null;
+  longitude: number | null;
+  location_updated_at: string | null;
+  max_distance_km: number;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  actor_id: string | null;
+  match_id: string | null;
+  message_id: string | null;
+  read_at: string | null;
+  created_at: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface Like {
