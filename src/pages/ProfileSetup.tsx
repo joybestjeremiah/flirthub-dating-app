@@ -12,6 +12,7 @@ export default function ProfileSetup() {
   const [gender, setGender] = useState(profile?.gender ?? 'male');
   const [interestedIn, setInterestedIn] = useState(profile?.interested_in ?? 'all');
   const [city, setCity] = useState(profile?.city ?? '');
+  const [isVisible, setIsVisible] = useState(profile?.is_visible ?? true);
   const [photoUrl, setPhotoUrl] = useState(profile?.photo_url ?? '');
   const [photoUrls, setPhotoUrls] = useState<string[]>(profile?.photo_url ? [profile.photo_url] : []);
   const [uploading, setUploading] = useState(false);
@@ -26,6 +27,7 @@ export default function ProfileSetup() {
       setGender(profile.gender ?? 'male');
       setInterestedIn(profile.interested_in ?? 'all');
       setCity(profile.city ?? '');
+      setIsVisible(profile.is_visible ?? true);
       setPhotoUrl(profile.photo_url ?? '');
     }
   }, [profile]);
@@ -76,6 +78,7 @@ export default function ProfileSetup() {
       interested_in: interestedIn,
       city: city.trim() || null,
       photo_url: photoUrl.trim() || null,
+      is_visible: isVisible,
       online: true,
       updated_at: new Date().toISOString(),
     });
@@ -122,6 +125,8 @@ export default function ProfileSetup() {
             <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none bg-white"><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Interested In</label><select value={interestedIn} onChange={(e) => setInterestedIn(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none bg-white"><option value="all">Everyone</option><option value="male">Men</option><option value="female">Women</option><option value="other">Other</option></select></div>
           </div>
+
+          <label className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100"><input type="checkbox" checked={isVisible} onChange={(e) => setIsVisible(e.target.checked)} className="w-4 h-4 accent-rose-500" /><span><span className="block text-sm font-medium text-gray-800">Show me in Discover</span><span className="block text-xs text-gray-500">Turn this off to hide your profile from new people.</span></span></label>
 
           <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Bio</label><textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none resize-none" placeholder="Tell us about yourself..." /></div>
 
