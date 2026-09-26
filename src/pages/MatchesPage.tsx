@@ -29,6 +29,7 @@ export default function MatchesPage({ onBack }: Props) {
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [unmatchingId, setUnmatchingId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadMatches();
@@ -64,7 +65,9 @@ export default function MatchesPage({ onBack }: Props) {
             : m
         ));
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && user) await channel.track({ userId: user.id, typing: false });
+      });
     return () => { supabase.removeChannel(channel); supabase.removeChannel(presence); };
   }, [user?.id, activeMatch?.id]);
 
@@ -192,6 +195,7 @@ export default function MatchesPage({ onBack }: Props) {
           }}
           onCall={handleCallClick}
           onGift={() => setShowGiftModal(true)}
+          isOtherOnline={onlineUsers.has(activeMatch.otherProfile.id)}
         />
         {showGiftModal && activeMatch && (
           <GiftSubscriptionModal
@@ -277,6 +281,7 @@ function ChatView({
   onBack,
   onCall,
   onGift,
+  isOtherOnline,
 }: {
   match: MatchWithProfile;
   onBack: () => void;
@@ -288,12 +293,25 @@ function ChatView({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadMessages();
     const channel = supabase
-      .channel(`messages:${match.id}`)
+      .channel(`messages:${match.id}`, { config: { presence: { key: user?.id || 'anonymous' } } })
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState<{ userId: string; typing?: boolean }>();
+        const other = Object.values(state).flat().find((entry) => entry.userId !== user?.id);
+        setIsOtherTyping(Boolean(other?.typing));
+      })
+      .on('presence', { event: 'join' }, () => {
+        const state = channel.presenceState<{ userId: string; typing?: boolean }>();
+        const other = Object.values(state).flat().find((entry) => entry.userId !== user?.id);
+        setIsOtherTyping(Boolean(other?.typing));
+      })
+      .on('presence', { event: 'leave' }, () => setIsOtherTyping(false))
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${match.id}` },
@@ -352,11 +370,25 @@ function ChatView({
     setLoading(false);
   };
 
+  const publishTyping = async (typing: boolean) => {
+    if (!user) return;
+    const channel = supabase.getChannels().find((item) => item.topic === `realtime:messages:${match.id}`);
+    if (channel) await channel.track({ userId: user.id, typing });
+  };
+
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    publishTyping(Boolean(value.trim()));
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => publishTyping(false), 1200);
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !user) return;
     const content = input.trim();
     setInput('');
+    await publishTyping(false);
 
     const { data, error } = await supabase
       .from('messages')
@@ -450,12 +482,13 @@ function ChatView({
           })
         )}
       </div>
+      {isOtherTyping && <div className="px-4 py-1 text-xs text-gray-400 bg-gray-50">{other?.display_name} is typing…</div>}
 
       <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white flex items-center gap-2">
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           placeholder="Type a message..."
           className="flex-1 px-4 py-2.5 rounded-full border border-gray-200 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 outline-none transition-all"
         />
