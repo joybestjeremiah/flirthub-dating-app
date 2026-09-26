@@ -134,3 +134,14 @@ test('production: admin dashboard is protected and renders for an admin account'
   await expect(page.locator('body')).not.toContainText(/access denied|unauthorized/i);
   await expect(page.getByText(/admin|overview|payments|users|subscriptions/i).first()).toBeVisible();
 });
+
+
+test('production: protected cron endpoint rejects unauthenticated requests', async ({ request }) => {
+  const response = await request.get('/api/cron/expire-subscriptions');
+  expect(response.status()).toBe(401);
+});
+
+test('production: subscription verification rejects malformed unauthenticated requests safely', async ({ request }) => {
+  const response = await request.post('/api/verify-subscription-payment', { data: {} });
+  expect([400, 401, 404, 405]).toContain(response.status());
+});
