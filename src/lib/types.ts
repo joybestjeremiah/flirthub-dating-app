@@ -10,6 +10,7 @@ export interface Profile {
   online: boolean;
   is_visible: boolean;
   is_admin: boolean;
+  moderation_status: 'active' | 'suspended' | 'banned';
   created_at: string;
   updated_at: string;
   latitude: number | null;
