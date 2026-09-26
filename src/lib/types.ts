@@ -8,6 +8,7 @@ export interface Profile {
   photo_url: string | null;
   city: string | null;
   online: boolean;
+  is_visible: boolean;
   is_admin: boolean;
   created_at: string;
   updated_at: string;
