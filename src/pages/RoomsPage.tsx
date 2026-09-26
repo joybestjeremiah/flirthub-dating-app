@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Send, Lock, Plus, Users, Loader2, MessageSquare, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Send, Lock, Plus, Users, Loader2, MessageSquare, Trash2, X, Gift } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Room, RoomMessage, Profile } from '@/lib/types';
@@ -279,10 +279,14 @@ function RoomChatView({ room, onBack }: { room: Room; onBack: () => void }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
+  const [gifts, setGifts] = useState<Array<{ id: string; name: string; emoji: string; price: number }>>([]);
+  const [giftBusy, setGiftBusy] = useState(false);
+  const [giftMessage, setGiftMessage] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadMessages();
+    supabase.from('virtual_gifts').select('id,name,emoji,price').eq('active', true).order('sort_order').then(({ data }) => setGifts((data || []) as Array<{ id: string; name: string; emoji: string; price: number }>));
     const channel = supabase
       .channel(`room_messages:${room.id}`)
       .on(
@@ -419,6 +423,11 @@ function RoomChatView({ room, onBack }: { room: Room; onBack: () => void }) {
         )}
       </div>
 
+      {giftMessage && <div className="px-4 py-2 text-xs bg-amber-50 text-amber-800 border-t border-amber-100">{giftMessage}</div>}
+      {!user || room.owner === user.id ? null : <div className="px-4 py-2 border-t border-gray-100 bg-white flex gap-2 overflow-x-auto">
+        <div className="flex items-center gap-1 text-xs font-semibold text-gray-500 shrink-0"><Gift className="w-4 h-4" /> Gifts</div>
+        {gifts.map((gift) => <button key={gift.id} type="button" onClick={() => handleGift(gift.id)} disabled={giftBusy} className="shrink-0 px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold disabled:opacity-50">{gift.emoji} ₦{Number(gift.price).toLocaleString()}</button>)}
+      </div>}
       <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white flex items-center gap-2">
         <input
           type="text"
