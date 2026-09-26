@@ -29,7 +29,7 @@ function useRoute() {
   return route;
 }
 function App() {
-  const { user, profile, loading, hasActiveSubscription, isAdmin, signOut } = useAuth();
+  const { user, profile, loading, hasActiveSubscription, isAdmin, signOut, refreshSubscription } = useAuth();
   const route = useRoute();
   const [showSubModal, setShowSubModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
