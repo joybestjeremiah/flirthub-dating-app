@@ -5,6 +5,8 @@ const testEmail = process.env.SMOKE_TEST_EMAIL;
 const testPassword = process.env.SMOKE_TEST_PASSWORD;
 const adminEmail = process.env.SMOKE_ADMIN_EMAIL;
 const adminPassword = process.env.SMOKE_ADMIN_PASSWORD;
+const premiumEmail = process.env.SMOKE_PREMIUM_EMAIL;
+const premiumPassword = process.env.SMOKE_PREMIUM_PASSWORD;
 
 test.use({ baseURL });
 
@@ -41,8 +43,8 @@ test('production: authenticated user can reach discovery, matches, rooms and sub
   test.skip(!testEmail || !testPassword, 'Set SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD for authenticated smoke tests.');
 
   await page.goto('/', { waitUntil: 'networkidle' });
-  await page.locator('input[type="email"]').first().fill(testEmail!);
-  await page.locator('input[type="password"]').first().fill(testPassword!);
+  await page.locator('input[type="email"]').first().fill(testEmail);
+  await page.locator('input[type="password"]').first().fill(testPassword);
   await page.getByRole('button', { name: /sign in|login/i }).first().click();
 
   await expect(page).toHaveURL(/discover|profile-setup/);
@@ -67,8 +69,8 @@ test('production: authenticated subscription UI exposes payment plans without ch
   test.skip(!testEmail || !testPassword, 'Set SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD for authenticated smoke tests.');
 
   await page.goto('/', { waitUntil: 'networkidle' });
-  await page.locator('input[type="email"]').first().fill(testEmail!);
-  await page.locator('input[type="password"]').first().fill(testPassword!);
+  await page.locator('input[type="email"]').first().fill(testEmail);
+  await page.locator('input[type="password"]').first().fill(testPassword);
   await page.getByRole('button', { name: /sign in|login/i }).first().click();
   await page.waitForLoadState('networkidle');
 
@@ -88,12 +90,43 @@ test('production: authenticated subscription UI exposes payment plans without ch
   }
 });
 
+test('production: premium user can open a match chat and send a smoke message', async ({ page }) => {
+  test.skip(!premiumEmail || !premiumPassword, 'Set SMOKE_PREMIUM_EMAIL and SMOKE_PREMIUM_PASSWORD for Premium chat smoke tests.');
+
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.locator('input[type="email"]').first().fill(premiumEmail);
+  await page.locator('input[type="password"]').first().fill(premiumPassword);
+  await page.getByRole('button', { name: /sign in|login/i }).first().click();
+  await page.waitForLoadState('networkidle');
+
+  if (await page.getByText(/complete your profile|profile setup/i).first().isVisible().catch(() => false)) {
+    test.skip(true, 'Premium test account requires profile setup.');
+  }
+
+  await page.goto('/matches', { waitUntil: 'networkidle' });
+  await expect(page.getByText(/your matches|no matches yet/i).first()).toBeVisible();
+
+  const matchButton = page.locator('button').filter({ has: page.locator('div.font-semibold') }).first();
+  if (!(await matchButton.isVisible().catch(() => false))) {
+    test.skip(true, 'Premium test account has no match; seed a match for full chat smoke coverage.');
+  }
+
+  await matchButton.click();
+  await expect(page.getByPlaceholder(/type a message|message/i)).toBeVisible();
+
+  const marker = 'FlirtHub production smoke test';
+  const input = page.getByPlaceholder(/type a message|message/i);
+  await input.fill(marker);
+  await page.getByRole('button', { name: /send/i }).click();
+  await expect(page.getByText(marker)).toBeVisible();
+});
+
 test('production: admin dashboard is protected and renders for an admin account', async ({ page }) => {
   test.skip(!adminEmail || !adminPassword, 'Set SMOKE_ADMIN_EMAIL and SMOKE_ADMIN_PASSWORD for admin smoke tests.');
 
   await page.goto('/', { waitUntil: 'networkidle' });
-  await page.locator('input[type="email"]').first().fill(adminEmail!);
-  await page.locator('input[type="password"]').first().fill(adminPassword!);
+  await page.locator('input[type="email"]').first().fill(adminEmail);
+  await page.locator('input[type="password"]').first().fill(adminPassword);
   await page.getByRole('button', { name: /sign in|login/i }).first().click();
   await page.waitForLoadState('networkidle');
 
