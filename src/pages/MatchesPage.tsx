@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck, Gift, MoreVertical, HeartOff } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck, Gift, HeartOff, ImagePlus, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Message, Match } from '@/lib/types';
@@ -292,6 +292,8 @@ function ChatView({
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -383,8 +385,24 @@ function ChatView({
     typingTimer.current = setTimeout(() => publishTyping(false), 1200);
   };
 
+  const handleSendImage = async () => {
+    if (!user || !selectedImage || uploadingImage) return;
+    if (!selectedImage.type.startsWith('image/')) return;
+    if (selectedImage.size > 5 * 1024 * 1024) { alert('Images must be 5 MB or smaller.'); return; }
+    setUploadingImage(true);
+    const ext = selectedImage.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `${match.id}/${user.id}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from('chat-media').upload(path, selectedImage, { contentType: selectedImage.type, upsert: false });
+    if (uploadError) { console.error(uploadError); alert('Could not upload this image.'); setUploadingImage(false); return; }
+    const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
+    const { data, error } = await supabase.from('messages').insert({ match_id: match.id, sender: user.id, content: '', message_type: 'image', media_url: urlData.publicUrl }).select('*').single();
+    if (error) { console.error(error); await supabase.storage.from('chat-media').remove([path]); alert('Could not send this image.'); } else if (data) setMessages(prev => prev.some(m => m.id === data.id) ? prev : [...prev, data as Message]);
+    setSelectedImage(null); setUploadingImage(false);
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedImage) { e.preventDefault(); await handleSendImage(); return; }
     if (!input.trim() || !user) return;
     const content = input.trim();
     setInput('');
@@ -470,7 +488,7 @@ function ChatView({
                       : 'bg-white text-gray-800 rounded-bl-md shadow-sm border border-gray-100'
                   }`}
                 >
-                  <div>{msg.content}</div>
+                  {msg.message_type === 'image' && msg.media_url ? <img src={msg.media_url} alt="Shared image" className="rounded-xl max-h-72 w-auto object-cover" loading="lazy" /> : <div>{msg.content}</div>}
                   {isMine && (
                     <div className="mt-1 flex justify-end">
                       {msg.read ? <CheckCheck className="w-3.5 h-3.5 text-white/80" /> : <Check className="w-3.5 h-3.5 text-white/70" />}
@@ -484,7 +502,9 @@ function ChatView({
       </div>
       {isOtherTyping && <div className="px-4 py-1 text-xs text-gray-400 bg-gray-50">{other?.display_name} is typing…</div>}
 
+      {selectedImage && <div className="px-4 py-2 bg-white border-t border-gray-100 flex items-center gap-3"><img src={URL.createObjectURL(selectedImage)} alt="Preview" className="w-14 h-14 rounded-lg object-cover" /><span className="text-xs text-gray-500 flex-1 truncate">{selectedImage.name}</span><button type="button" onClick={() => setSelectedImage(null)}><X className="w-4 h-4 text-gray-500" /></button></div>}
       <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white flex items-center gap-2">
+        <label className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center cursor-pointer hover:border-rose-400 text-gray-500"><ImagePlus className="w-5 h-5" /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploadingImage} onChange={(e) => setSelectedImage(e.target.files?.[0] || null)} /></label>
         <input
           type="text"
           value={input}
@@ -494,10 +514,10 @@ function ChatView({
         />
         <button
           type="submit"
-          disabled={!input.trim()}
+          disabled={(!input.trim() && !selectedImage) || uploadingImage}
           className="w-10 h-10 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 text-white flex items-center justify-center disabled:opacity-50 hover:scale-105 active:scale-95 transition-transform"
         >
-          <Send className="w-5 h-5" />
+          {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
         </button>
       </form>
     </div>
