@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, Loader2, Check, LogOut, Trash2, MailCheck, RefreshCw } from 'lucide-react';
+import { Camera, Loader2, Check, LogOut, Trash2, MailCheck, RefreshCw, Navigation } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { navigate } from '@/App';
@@ -21,6 +21,9 @@ export default function ProfileSetup() {
   const [deleting, setDeleting] = useState(false);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [maxDistanceKm, setMaxDistanceKm] = useState(profile?.max_distance_km ?? 50);
 
   useEffect(() => {
     if (profile) {
@@ -32,6 +35,7 @@ export default function ProfileSetup() {
       setCity(profile.city ?? '');
       setIsVisible(profile.is_visible ?? true);
       setPhotoUrl(profile.photo_url ?? '');
+      setMaxDistanceKm(profile.max_distance_km ?? 50);
     }
   }, [profile]);
 
@@ -66,6 +70,15 @@ export default function ProfileSetup() {
     setPhotoUrls(next); setPhotoUrl(next[0] ?? '');
   };
 
+  const updateLocation = async () => {
+    if (!user || !navigator.geolocation) { setLocationMessage('Location is not supported by this browser.'); return; }
+    setLocationBusy(true); setLocationMessage(null);
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const { error } = await supabase.from('profiles').update({ latitude: position.coords.latitude, longitude: position.coords.longitude, location_updated_at: new Date().toISOString() }).eq('id', user.id);
+      setLocationBusy(false); setLocationMessage(error ? error.message : 'Location updated. Your exact coordinates are not shown to other users.');
+    }, (error) => { setLocationBusy(false); setLocationMessage(error.message || 'Location permission was not granted.'); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -82,6 +95,7 @@ export default function ProfileSetup() {
       city: city.trim() || null,
       photo_url: photoUrl.trim() || null,
       is_visible: isVisible,
+      max_distance_km: maxDistanceKm,
       online: true,
       updated_at: new Date().toISOString(),
     });
@@ -145,6 +159,8 @@ export default function ProfileSetup() {
             <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none bg-white"><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Interested In</label><select value={interestedIn} onChange={(e) => setInterestedIn(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none bg-white"><option value="all">Everyone</option><option value="male">Men</option><option value="female">Women</option><option value="other">Other</option></select></div>
           </div>
+
+          <div className="rounded-xl bg-gray-50 border border-gray-100 p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-gray-800">Nearby matching</div><div className="text-xs text-gray-500">Choose how far away people can be when location is available.</div></div><Navigation className="w-5 h-5 text-rose-500" /></div><select value={maxDistanceKm} onChange={(e) => setMaxDistanceKm(Number(e.target.value))} className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white"><option value={5}>Within 5 km</option><option value={10}>Within 10 km</option><option value={25}>Within 25 km</option><option value={50}>Within 50 km</option><option value={100}>Within 100 km</option><option value={250}>Within 250 km</option></select><button type="button" onClick={updateLocation} disabled={locationBusy} className="mt-3 w-full py-2.5 rounded-xl border border-rose-200 text-rose-600 font-semibold text-sm disabled:opacity-60">{locationBusy ? 'Updating location…' : 'Use my current location'}</button>{locationMessage && <p className="text-xs text-gray-600 mt-2">{locationMessage}</p>}</div>
 
           <label className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100"><input type="checkbox" checked={isVisible} onChange={(e) => setIsVisible(e.target.checked)} className="w-4 h-4 accent-rose-500" /><span><span className="block text-sm font-medium text-gray-800">Show me in Discover</span><span className="block text-xs text-gray-500">Turn this off to hide your profile from new people.</span></span></label>
 
