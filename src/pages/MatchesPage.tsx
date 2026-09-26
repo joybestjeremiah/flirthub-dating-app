@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck, Gift } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, Lock, Loader2, MessageCircle, Check, CheckCheck, Gift, MoreVertical, HeartOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Message, Match } from '@/lib/types';
@@ -27,6 +27,7 @@ export default function MatchesPage({ onBack }: Props) {
   const [showCallModal, setShowCallModal] = useState(false);
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
   const [showGiftModal, setShowGiftModal] = useState(false);
+  const [unmatchingId, setUnmatchingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadMatches();
@@ -121,6 +122,18 @@ export default function MatchesPage({ onBack }: Props) {
     setActiveMatch({ ...match, unreadCount: 0 });
   };
 
+  const handleUnmatch = async (match: MatchWithProfile) => {
+    if (!user || unmatchingId) return;
+    const confirmed = window.confirm(`Unmatch with ${match.otherProfile?.display_name || 'this person'}? Your conversation will be removed.`);
+    if (!confirmed) return;
+    setUnmatchingId(match.id); setError(null);
+    const { error } = await supabase.from('matches').delete().eq('id', match.id);
+    setUnmatchingId(null);
+    if (error) { setError('We could not remove this match. Please try again.'); return; }
+    if (activeMatch?.id === match.id) setActiveMatch(null);
+    setMatches((prev) => prev.filter((item) => item.id !== match.id));
+  };
+
   const handleCallClick = (type: 'audio' | 'video') => {
     if (!hasActiveSubscription) {
       setShowSubModal(true);
@@ -196,6 +209,7 @@ export default function MatchesPage({ onBack }: Props) {
         <h1 className="text-2xl font-bold text-gray-900">Your Matches</h1>
       </div>
 
+      {error && <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</div>}
       <div className="space-y-3">
         {matches.map((match) => (
           <button
@@ -229,9 +243,8 @@ export default function MatchesPage({ onBack }: Props) {
                 {match.unreadCount > 99 ? '99+' : match.unreadCount}
               </span>
             )}
-            {!hasActiveSubscription && (
-              <Lock className="w-5 h-5 text-rose-400 flex-shrink-0" />
-            )}
+            {!hasActiveSubscription && <Lock className="w-5 h-5 text-rose-400 flex-shrink-0" />}
+            <button type="button" onClick={(e) => { e.stopPropagation(); handleUnmatch(match); }} disabled={unmatchingId === match.id} className="p-2 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-50" title="Unmatch">{unmatchingId === match.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartOff className="w-4 h-4" />}</button>
           </button>
         ))}
       </div>
