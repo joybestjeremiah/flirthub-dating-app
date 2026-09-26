@@ -23,9 +23,9 @@ export default function WalletModal({ onClose }: WalletModalProps) {
     const reference = params.get('reference') || txRef;
     const transactionId = params.get('transaction_id');
     const status = params.get('status');
-    if (txRef && transactionId && status === 'successful') {
+    if (reference && status === 'successful') {
       setLoading(true);
-      supabase.functions.invoke('verify-wallet-topup', { body: { reference, transaction_id: transactionId } })
+      supabase.functions.invoke('verify-wallet-topup', { body: { reference, transaction_id: transactionId || undefined } })
         .then(({ data, error }) => {
           if (error) throw error;
           if (!data?.success) throw new Error(data?.error ?? 'Payment could not be verified.');
