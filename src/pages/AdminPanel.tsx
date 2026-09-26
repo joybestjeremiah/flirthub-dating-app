@@ -57,6 +57,7 @@ export default function AdminPanel({ onBack }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [paymentSearch, setPaymentSearch] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'all' | 'successful' | 'pending' | 'failed' | 'expired'>('all');
+  const [paymentRange, setPaymentRange] = useState<'7' | '30' | '365' | 'all'>('30');
 
   useEffect(() => {
     loadAll();
@@ -275,6 +276,9 @@ export default function AdminPanel({ onBack }: Props) {
   };
 
   const paymentRows = subscriptions.filter((s) => {
+    const cutoff = paymentRange === 'all' ? 0 : Date.now() - Number(paymentRange) * 86400000;
+    const created = new Date(s.created_at ?? s.starts_at ?? s.expires_at).getTime();
+    if (created < cutoff) return false;
     const q = paymentSearch.trim().toLowerCase();
     const matchesSearch = !q || [s.tx_ref, s.flutterwave_transaction_id, s.profile?.display_name, s.profile?.city].some(v => String(v ?? '').toLowerCase().includes(q));
     const actual = s.status === 'active' && new Date(s.expires_at) <= new Date() ? 'expired' : s.status;
@@ -285,7 +289,10 @@ export default function AdminPanel({ onBack }: Props) {
   const paymentMetrics = (() => {
     const rows = subscriptions.map(s => ({ ...s, effectiveStatus: s.status === 'active' && new Date(s.expires_at) <= new Date() ? 'expired' : s.status }));
     const successful = rows.filter(s => s.effectiveStatus === 'active' || s.effectiveStatus === 'expired');
-    return { revenue: successful.reduce((n,s) => n + Number(s.amount), 0), successful: successful.length, pending: rows.filter(s => s.effectiveStatus === 'pending').length, failed: rows.filter(s => s.effectiveStatus === 'failed').length, expired: rows.filter(s => s.effectiveStatus === 'expired').length };
+    const cutoff = paymentRange === 'all' ? 0 : Date.now() - Number(paymentRange) * 86400000;
+    const ranged = rows.filter(s => new Date(s.created_at ?? s.starts_at ?? s.expires_at).getTime() >= cutoff);
+    const paid = ranged.filter(s => s.effectiveStatus === 'active' || s.effectiveStatus === 'expired');
+    return { revenue: paid.reduce((n,s) => n + Number(s.amount), 0), successful: paid.length, pending: ranged.filter(s => s.effectiveStatus === 'pending').length, failed: ranged.filter(s => s.effectiveStatus === 'failed').length, expired: ranged.filter(s => s.effectiveStatus === 'expired').length };
   })();
 
   const filteredUsers = users.filter(
@@ -374,7 +381,7 @@ export default function AdminPanel({ onBack }: Props) {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5">
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input value={paymentSearch} onChange={e => setPaymentSearch(e.target.value)} placeholder="Search transaction ID, tx ref, or user..." className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-rose-400" /></div>
-                <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value as typeof paymentStatus)} className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-white"><option value="all">All statuses</option><option value="successful">Successful</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="expired">Expired</option></select>
+                <select value={paymentRange} onChange={e => setPaymentRange(e.target.value as typeof paymentRange)} className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-white"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="365">Last 12 months</option><option value="all">All time</option></select><select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value as typeof paymentStatus)} className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-white"><option value="all">All statuses</option><option value="successful">Successful</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="expired">Expired</option></select>
               </div>
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
