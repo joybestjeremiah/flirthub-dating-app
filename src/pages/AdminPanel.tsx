@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import type { Profile, Subscription, Room, Match, Message } from '@/lib/types';
+import type { Profile, Subscription, Room } from '@/lib/types';
 
 interface AdminStats {
   totalUsers: number;
@@ -49,7 +49,7 @@ export default function AdminPanel({ onBack }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [subscriptions, setSubscriptions] = useState<(Subscription & { profile?: Profile })[]>([]);
   const [rooms, setRooms] = useState<(Room & { ownerProfile?: Profile; memberCount: number })[]>([]);
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<Array<{ id: string; reason: string; details?: string | null; reported: string; created_at: string; status: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -222,14 +222,6 @@ export default function AdminPanel({ onBack }: Props) {
     await loadStats();
   };
 
-  const handleExpireSubscription = async (subId: string) => {
-    setActionBusy(true); setActionError(null);
-    const { error } = await supabase.from('subscriptions').update({ status: 'expired' }).eq('id', subId).eq('status', 'active');
-    setActionBusy(false);
-    if (error) { setActionError(error.message); return; }
-    await loadSubscriptions(); await loadStats();
-  };
-
   const handleRevokeSubscription = async (subId: string) => {
     if (!confirm('Revoke this subscription?')) return;
     setActionBusy(true);
@@ -288,7 +280,6 @@ export default function AdminPanel({ onBack }: Props) {
 
   const paymentMetrics = (() => {
     const rows = subscriptions.map(s => ({ ...s, effectiveStatus: s.status === 'active' && new Date(s.expires_at) <= new Date() ? 'expired' : s.status }));
-    const successful = rows.filter(s => s.effectiveStatus === 'active' || s.effectiveStatus === 'expired');
     const cutoff = paymentRange === 'all' ? 0 : Date.now() - Number(paymentRange) * 86400000;
     const ranged = rows.filter(s => new Date(s.created_at ?? s.starts_at ?? s.expires_at).getTime() >= cutoff);
     const paid = ranged.filter(s => s.effectiveStatus === 'active' || s.effectiveStatus === 'expired');
