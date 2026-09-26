@@ -53,7 +53,7 @@ export default function DiscoverPage() {
     setLikedIds(likedSet);
     setPassedIds(passedSet);
 
-    const me = (await supabase.from('profiles').select('gender, interested_in').eq('id', user.id).maybeSingle()).data as Pick<Profile, 'gender' | 'interested_in'> | null;
+    const me = (await supabase.from('profiles').select('gender, interested_in') .eq('id', user.id).maybeSingle()).data as Pick<Profile, 'gender' | 'interested_in'> | null;
     const filtered = (profileData || []).filter((p) => {
       const candidate = p as Profile;
       const genderMatches = !me?.interested_in || me.interested_in === 'all' || me.interested_in === candidate.gender;
