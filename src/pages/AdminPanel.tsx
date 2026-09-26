@@ -87,7 +87,7 @@ export default function AdminPanel({ onBack }: Props) {
     const activeSubs = (subData || []).filter(
       (s) => s.status === 'active' && new Date(s.expires_at) > now
     );
-    const revenue = activeSubs.reduce((sum, s) => sum + Number(s.amount), 0);
+    const revenue = (subData || []).filter((s) => s.status === 'active' || s.status === 'expired').reduce((sum, s) => sum + Number(s.amount), 0);
 
     setStats({
       totalUsers: userCount || 0,
@@ -205,6 +205,7 @@ export default function AdminPanel({ onBack }: Props) {
       .from('subscriptions')
       .update({
         status: 'active',
+        paid_at: sub.paid_at ?? new Date().toISOString(),
         starts_at: starts.toISOString(),
         expires_at: expires.toISOString(),
       })
@@ -216,6 +217,14 @@ export default function AdminPanel({ onBack }: Props) {
     }
     await loadSubscriptions();
     await loadStats();
+  };
+
+  const handleExpireSubscription = async (subId: string) => {
+    setActionBusy(true); setActionError(null);
+    const { error } = await supabase.from('subscriptions').update({ status: 'expired' }).eq('id', subId).eq('status', 'active');
+    setActionBusy(false);
+    if (error) { setActionError(error.message); return; }
+    await loadSubscriptions(); await loadStats();
   };
 
   const handleRevokeSubscription = async (subId: string) => {
