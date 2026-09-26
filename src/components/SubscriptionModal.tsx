@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Crown, Check, Loader2, X, Sparkles } from 'lucide-react';
+import { Crown, Loader2, X, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { PLAN_PRICES, PLAN_LABELS, type PlanKey } from '@/lib/types';
