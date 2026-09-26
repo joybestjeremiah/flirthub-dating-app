@@ -295,6 +295,14 @@ export default function AdminPanel({ onBack }: Props) {
     return { revenue: paid.reduce((n,s) => n + Number(s.amount), 0), successful: paid.length, pending: ranged.filter(s => s.effectiveStatus === 'pending').length, failed: ranged.filter(s => s.effectiveStatus === 'failed').length, expired: ranged.filter(s => s.effectiveStatus === 'expired').length };
   })();
 
+  const exportPaymentsCsv = () => {
+    const header = ['User','Plan','Amount NGN','Status','Tx Ref','Flutterwave Transaction ID','Paid At','Created At'];
+    const rows = paymentRows.map(s => [s.profile?.display_name || '', s.plan, Number(s.amount), s.status, s.tx_ref || '', s.flutterwave_transaction_id || '', s.paid_at || '', s.created_at || '']);
+    const csv = [header, ...rows].map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='flirthub-payments.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
   const filteredUsers = users.filter(
     (u) =>
       u.display_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -369,7 +377,7 @@ export default function AdminPanel({ onBack }: Props) {
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
               <div><h2 className="text-xl font-bold text-gray-900">Payment Analytics</h2><p className="text-sm text-gray-500 mt-1">Premium revenue and transaction monitoring</p></div>
-              <button onClick={loadAll} className="text-sm text-rose-600 font-semibold">Refresh</button>
+              <div className="flex items-center gap-3"><button onClick={exportPaymentsCsv} className="text-sm text-gray-700 font-semibold">Export CSV</button><button onClick={loadAll} className="text-sm text-rose-600 font-semibold">Refresh</button></div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
               <StatCard icon={DollarSign} label="Revenue" value={`₦${paymentMetrics.revenue.toLocaleString()}`} color="green" />
