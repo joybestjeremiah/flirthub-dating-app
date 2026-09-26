@@ -157,7 +157,9 @@ export default function AdminPanel({ onBack }: Props) {
     const note = prompt(status === 'paid' ? 'Optional payout note:' : 'Reason for rejection:') || null;
     if (status === 'rejected' && !note) return;
     setActionBusy(true); setActionError(null);
-    const { error } = await supabase.rpc('admin_process_host_withdrawal', { p_withdrawal_id: id, p_status: status,\n      p_payout_reference: status === 'paid' ? `ADMIN-${Date.now()}` : null,\n      p_payout_provider: status === 'paid' ? 'manual_bank_transfer' : null, p_admin_note: note });
+    const { error } = await supabase.rpc('admin_process_host_withdrawal', { p_withdrawal_id: id, p_status: status,
+      p_payout_reference: status === 'paid' ? `ADMIN-${Date.now()}` : null,
+      p_payout_provider: status === 'paid' ? 'manual_bank_transfer' : null, p_admin_note: note });
     setActionBusy(false);
     if (error) { setActionError(error.message); return; }
     await loadWithdrawals();
@@ -322,7 +324,8 @@ export default function AdminPanel({ onBack }: Props) {
   const exportPaymentsCsv = () => {
     const header = ['User','Plan','Amount NGN','Status','Tx Ref','Paystack Transaction ID','Paid At','Created At'];
     const rows = paymentRows.map(s => [s.profile?.display_name || '', s.plan, Number(s.amount), s.status, s.tx_ref || '', s.flutterwave_transaction_id || '', s.paid_at || '', s.created_at || '']);
-    const csv = [header, ...rows].map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const csv = [header, ...rows].map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('
+');
     const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='flirthub-payments.csv'; a.click(); URL.revokeObjectURL(url);
   };
