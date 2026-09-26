@@ -277,7 +277,6 @@ export default function MatchesPage({ onBack }: Props) {
 
 function ChatView({
   match,
-  isOtherOnline,
   onBack,
   onCall,
   onGift,
