@@ -36,7 +36,7 @@ interface AdminUser extends Profile {
   subscription?: Subscription | null;
 }
 
-type AdminTab = 'overview' | 'users' | 'subscriptions' | 'rooms' | 'reports';
+type AdminTab = 'overview' | 'payments' | 'users' | 'subscriptions' | 'rooms' | 'reports';
 
 interface Props {
   onBack: () => void;
@@ -55,6 +55,8 @@ export default function AdminPanel({ onBack }: Props) {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [paymentSearch, setPaymentSearch] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<'all' | 'successful' | 'pending' | 'failed' | 'expired'>('all');
 
   useEffect(() => {
     loadAll();
@@ -272,6 +274,20 @@ export default function AdminPanel({ onBack }: Props) {
     setSelectedUser(null);
   };
 
+  const paymentRows = subscriptions.filter((s) => {
+    const q = paymentSearch.trim().toLowerCase();
+    const matchesSearch = !q || [s.tx_ref, s.flutterwave_transaction_id, s.profile?.display_name, s.profile?.city].some(v => String(v ?? '').toLowerCase().includes(q));
+    const actual = s.status === 'active' && new Date(s.expires_at) <= new Date() ? 'expired' : s.status;
+    const matchesStatus = paymentStatus === 'all' || (paymentStatus === 'successful' ? (actual === 'active' || actual === 'expired') : actual === paymentStatus);
+    return matchesSearch && matchesStatus;
+  });
+
+  const paymentMetrics = (() => {
+    const rows = subscriptions.map(s => ({ ...s, effectiveStatus: s.status === 'active' && new Date(s.expires_at) <= new Date() ? 'expired' : s.status }));
+    const successful = rows.filter(s => s.effectiveStatus === 'active' || s.effectiveStatus === 'expired');
+    return { revenue: successful.reduce((n,s) => n + Number(s.amount), 0), successful: successful.length, pending: rows.filter(s => s.effectiveStatus === 'pending').length, failed: rows.filter(s => s.effectiveStatus === 'failed').length, expired: rows.filter(s => s.effectiveStatus === 'expired').length };
+  })();
+
   const filteredUsers = users.filter(
     (u) =>
       u.display_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -311,6 +327,7 @@ export default function AdminPanel({ onBack }: Props) {
         <div className="max-w-5xl mx-auto flex gap-1 px-4">
           {([
             { key: 'overview', label: 'Overview', icon: TrendingUp },
+            { key: 'payments', label: 'Payments', icon: DollarSign },
             { key: 'users', label: 'Users', icon: Users },
             { key: 'subscriptions', label: 'Subscriptions', icon: Crown },
             { key: 'rooms', label: 'Rooms', icon: DoorOpen },
@@ -341,6 +358,36 @@ export default function AdminPanel({ onBack }: Props) {
             </button>
           </div>
         )}
+        {tab === 'payments' && (
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <div><h2 className="text-xl font-bold text-gray-900">Payment Analytics</h2><p className="text-sm text-gray-500 mt-1">Premium revenue and transaction monitoring</p></div>
+              <button onClick={loadAll} className="text-sm text-rose-600 font-semibold">Refresh</button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+              <StatCard icon={DollarSign} label="Revenue" value={`₦${paymentMetrics.revenue.toLocaleString()}`} color="green" />
+              <StatCard icon={CheckCircle} label="Successful" value={paymentMetrics.successful} color="rose" />
+              <StatCard icon={TrendingUp} label="Pending" value={paymentMetrics.pending} color="orange" />
+              <StatCard icon={XCircle} label="Failed" value={paymentMetrics.failed} color="purple" />
+              <StatCard icon={Crown} label="Expired" value={paymentMetrics.expired} color="amber" />
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5">
+              <div className="flex flex-col md:flex-row gap-3">
+                <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input value={paymentSearch} onChange={e => setPaymentSearch(e.target.value)} placeholder="Search transaction ID, tx ref, or user..." className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-rose-400" /></div>
+                <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value as typeof paymentStatus)} className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-white"><option value="all">All statuses</option><option value="successful">Successful</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="expired">Expired</option></select>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[760px]"><thead className="bg-gray-50 border-b border-gray-100"><tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">User</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Plan</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Transaction</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Paid</th>
+              </tr></thead><tbody className="divide-y divide-gray-50">
+                {paymentRows.map(s => { const effective=s.status==='active'&&new Date(s.expires_at)<=new Date()?'expired':s.status; const label=effective==='active'?'Successful':effective.charAt(0).toUpperCase()+effective.slice(1); return <tr key={s.id}><td className="px-4 py-3 text-sm font-medium text-gray-900">{s.profile?.display_name||'Unknown'}</td><td className="px-4 py-3 text-sm text-gray-600">{s.plan==='weekly'?'7 Days':'1 Month'}</td><td className="px-4 py-3 text-sm font-semibold">₦{Number(s.amount).toLocaleString()}</td><td className="px-4 py-3"><span className={`text-xs font-semibold px-2 py-1 rounded-lg ${effective==='active'?'bg-green-50 text-green-700':effective==='pending'?'bg-amber-50 text-amber-700':effective==='failed'?'bg-red-50 text-red-700':'bg-gray-100 text-gray-600'}`}>{label}</span></td><td className="px-4 py-3 text-xs text-gray-500 max-w-[240px]"><div className="truncate">{s.flutterwave_transaction_id||s.tx_ref||'—'}</div>{s.tx_ref&&s.flutterwave_transaction_id&&<div className="truncate text-[10px] text-gray-400">{s.tx_ref}</div>}</td><td className="px-4 py-3 text-xs text-gray-500">{s.paid_at?new Date(s.paid_at).toLocaleString():'—'}</td></tr>; })}
+                {paymentRows.length===0&&<tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">No matching transactions.</td></tr>}
+              </tbody></table>
+            </div>
+          </div>
+        )}
+
         {/* Overview */}
         {tab === 'overview' && stats && (
           <div>
