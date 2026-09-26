@@ -105,6 +105,9 @@ export interface Subscription {
   starts_at: string;
   expires_at: string;
   created_at: string;
+  tx_ref?: string | null;
+  paystack_transaction_id?: string | null;
+  paid_at?: string | null;
 }
 
 export const PLAN_PRICES = {
