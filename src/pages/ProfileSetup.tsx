@@ -15,7 +15,6 @@ export default function ProfileSetup() {
   const [isVisible, setIsVisible] = useState(profile?.is_visible ?? true);
   const [photoUrl, setPhotoUrl] = useState(profile?.photo_url ?? '');
   const [photoUrls, setPhotoUrls] = useState<string[]>(profile?.photo_url ? [profile.photo_url] : []);
-  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -38,37 +37,6 @@ export default function ProfileSetup() {
       setMaxDistanceKm(profile.max_distance_km ?? 50);
     }
   }, [profile]);
-
-  const handlePhotoUpload = async (files: FileList | null) => {
-    if (!user || !files?.length) return;
-    setUploading(true); setError(null);
-    try {
-      const uploaded: string[] = [...photoUrls];
-      for (const file of Array.from(files).slice(0, 6 - uploaded.length)) {
-        if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) continue;
-        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from('profile-photos').upload(path, file, { upsert: false, contentType: file.type });
-        if (uploadError) throw uploadError;
-        const { data } = supabase.storage.from('profile-photos').getPublicUrl(path);
-        uploaded.push(data.publicUrl);
-        const { error: rowError } = await supabase.from('profile_photos').insert({ user_id: user.id, storage_path: path, photo_url: data.publicUrl, sort_order: uploaded.length - 1 });
-        if (rowError) throw rowError;
-      }
-      setPhotoUrls(uploaded);
-      setPhotoUrl(uploaded[0] ?? '');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Photo upload failed'); }
-    finally { setUploading(false); }
-  };
-
-  const removePhoto = async (url: string) => {
-    if (!user) return;
-    const { data: row } = await supabase.from('profile_photos').select('storage_path').eq('user_id', user.id).eq('photo_url', url).maybeSingle();
-    if (row?.storage_path) await supabase.storage.from('profile-photos').remove([row.storage_path]);
-    await supabase.from('profile_photos').delete().eq('user_id', user.id).eq('photo_url', url);
-    const next = photoUrls.filter((item) => item !== url);
-    setPhotoUrls(next); setPhotoUrl(next[0] ?? '');
-  };
 
   const updateLocation = async () => {
     if (!user || !navigator.geolocation) { setLocationMessage('Location is not supported by this browser.'); return; }
