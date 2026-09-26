@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Crown, Check, Loader2, X, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { PLAN_PRICES, PLAN_DURATIONS, PLAN_LABELS, type PlanKey } from '@/lib/types';
+import { PLAN_PRICES, PLAN_LABELS, type PlanKey } from '@/lib/types';
 
 interface Props {
   onClose: () => void;
@@ -10,11 +10,10 @@ interface Props {
 }
 
 export default function SubscriptionModal({ onClose, reason }: Props) {
-  const { user, refreshSubscription } = useAuth();
+  const { user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const handleSubscribe = async () => {
     if (!user || !selectedPlan) return;
@@ -58,16 +57,7 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
             </div>
           )}
 
-          {success ? (
-            <div className="text-center py-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-3">
-                <Check className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Payment Started</h3>
-              <p className="text-gray-500 text-sm mt-1">Complete the secure Flutterwave checkout to activate Premium.</p>
-            </div>
-          ) : (
-            <>
+          <>
               <div className="space-y-3 mb-5">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Sparkles className="w-4 h-4 text-rose-500" />
@@ -141,7 +131,6 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
                 Subscribe Now
               </button>
             </>
-          )}
         </div>
       </div>
     </div>
