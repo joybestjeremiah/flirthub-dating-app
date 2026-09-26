@@ -7,8 +7,6 @@ import type { Profile } from '@/lib/types';
 export default function DiscoverPage() {
   const { user } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const [passedIds, setPassedIds] = useState<Set<string>>(new Set());
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -53,8 +51,6 @@ export default function DiscoverPage() {
     const likedSet = new Set((likesData || []).map((l: { to_user: string }) => l.to_user));
     const passedSet = new Set((passesData || []).map((p: { to_user: string }) => p.to_user));
     const blockedSet = new Set((blocksData || []).map((b: { blocked: string }) => b.blocked));
-    setLikedIds(likedSet);
-    setPassedIds(passedSet);
 
     const { data: meData } = await supabase.from('profiles').select('gender, interested_in, latitude, longitude, max_distance_km').eq('id', user.id).maybeSingle();
     const me = meData as Pick<Profile, 'gender' | 'interested_in'> & { latitude?: number | null; longitude?: number | null; max_distance_km?: number } | null;
@@ -121,7 +117,6 @@ export default function DiscoverPage() {
       }
     }
 
-    setLikedIds((prev) => new Set(prev).add(target.id));
     setCurrentIdx((prev) => prev + 1);
     setActionLoading(false);
   };
@@ -163,7 +158,6 @@ export default function DiscoverPage() {
       return;
     }
 
-    setPassedIds((prev) => new Set(prev).add(target.id));
     setCurrentIdx((prev) => prev + 1);
     setActionLoading(false);
   };
@@ -286,6 +280,9 @@ export default function DiscoverPage() {
       </div>
 
       {showProfile && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-5"><div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">{current.display_name}'s profile</h2><button onClick={() => setShowProfile(false)} className="text-gray-500">✕</button></div><div className="grid grid-cols-2 gap-2">{(profilePhotos.length ? profilePhotos : (current.photo_url ? [current.photo_url] : [])).map((url) => <img key={url} src={url} alt={current.display_name} className="w-full aspect-square object-cover rounded-2xl" />)}</div><div className="mt-4"><div className="text-lg font-semibold">{current.display_name}{current.age ? `, ${current.age}` : ''}</div>{current.city && <div className="text-sm text-gray-500 mt-1">{current.city}</div>}{current.bio && <p className="text-gray-700 mt-3 whitespace-pre-wrap">{current.bio}</p>}</div><button onClick={() => { setShowProfile(false); setShowSafety(true); }} className="w-full mt-5 py-3 rounded-xl border border-gray-200 text-gray-700">Safety options</button></div></div>}
+
+
+      {showSafety && current && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-md bg-white rounded-3xl p-5"><div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-gray-900">Safety options</h2><button onClick={() => setShowSafety(false)} className="text-gray-500">✕</button></div><p className="text-sm text-gray-600 mb-4">Block or report {current.display_name}. Reports are reviewed by the FlirtHub moderation team.</p><label className="block text-sm font-medium text-gray-700 mb-1.5">Report reason</label><select value={reportReason} onChange={(e) => setReportReason(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 bg-white mb-4"><option value="">Choose a reason</option><option value="spam">Spam or scam</option><option value="harassment">Harassment</option><option value="fake_profile">Fake profile</option><option value="inappropriate_content">Inappropriate content</option><option value="other">Other</option></select><div className="grid grid-cols-2 gap-3"><button onClick={() => handleSafetyAction('block')} className="py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 font-semibold">Block</button><button onClick={() => handleSafetyAction('report')} disabled={!reportReason} className="py-3 rounded-xl bg-rose-600 text-white font-semibold disabled:opacity-50">Report</button></div></div></div>}
 
       <div className="flex items-center justify-center gap-6 mt-6">
         <button
