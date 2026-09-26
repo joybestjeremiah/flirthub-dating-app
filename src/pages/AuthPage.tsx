@@ -3,8 +3,8 @@ import { Heart, Mail, Lock, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AuthPage() {
-  const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
+  const { signIn, signUp, resetPassword } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -14,8 +14,7 @@ export default function AuthPage() {
     e.preventDefault();
     setError(null);
     setBusy(true);
-    const fn = mode === 'signin' ? signIn : signUp;
-    const { error } = await fn(email, password);
+    const { error } = mode === 'reset' ? await resetPassword(email) : await (mode === 'signin' ? signIn(email, password) : signUp(email, password));
     setBusy(false);
     if (error) setError(error);
   };
@@ -32,7 +31,7 @@ export default function AuthPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl">
+          {mode === 'reset' ? <div className="mb-6"><h2 className="text-lg font-semibold text-gray-900">Reset your password</h2><p className="text-sm text-gray-500 mt-1">We’ll email you a secure password reset link.</p></div> : <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl">
             <button
               onClick={() => setMode('signup')}
               className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
@@ -49,7 +48,7 @@ export default function AuthPage() {
             >
               Sign In
             </button>
-          </div>
+          </div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -67,7 +66,7 @@ export default function AuthPage() {
               </div>
             </div>
 
-            <div>
+            {mode !== 'reset' && <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -81,7 +80,7 @@ export default function AuthPage() {
                   placeholder="••••••••"
                 />
               </div>
-            </div>
+            </div>}
 
             {error && (
               <div className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2.5">
@@ -95,9 +94,12 @@ export default function AuthPage() {
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold shadow-lg shadow-rose-500/30 hover:shadow-rose-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {busy && <Loader2 className="w-5 h-5 animate-spin" />}
-              {mode === 'signin' ? 'Sign In' : 'Create Account'}
+              {mode === 'reset' ? 'Send Reset Link' : mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
+
+          {mode === 'signin' && <button type="button" onClick={() => setMode('reset')} className="w-full mt-4 text-sm text-rose-600 hover:underline">Forgot your password?</button>}
+          {mode === 'reset' && <button type="button" onClick={() => setMode('signin')} className="w-full mt-4 text-sm text-gray-600 hover:underline">Back to sign in</button>}
 
           <p className="text-center text-xs text-gray-400 mt-6">
             By continuing you agree to our Terms & Privacy Policy
