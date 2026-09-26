@@ -153,11 +153,11 @@ export default function AdminPanel({ onBack }: Props) {
     setWithdrawals((data || []) as typeof withdrawals);
   };
 
-  const processWithdrawal = async (id: string, status: 'paid' | 'rejected') => {
+  const processWithdrawal = async (id: string, status: 'paid' | 'rejected' | 'failed') => {
     const note = prompt(status === 'paid' ? 'Optional payout note:' : 'Reason for rejection:') || null;
     if (status === 'rejected' && !note) return;
     setActionBusy(true); setActionError(null);
-    const { error } = await supabase.rpc('admin_process_host_withdrawal', { p_withdrawal_id: id, p_status: status, p_admin_note: note });
+    const { error } = await supabase.rpc('admin_process_host_withdrawal', { p_withdrawal_id: id, p_status: status,\n      p_payout_reference: status === 'paid' ? `ADMIN-${Date.now()}` : null,\n      p_payout_provider: status === 'paid' ? 'manual_bank_transfer' : null, p_admin_note: note });
     setActionBusy(false);
     if (error) { setActionError(error.message); return; }
     await loadWithdrawals();
