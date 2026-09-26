@@ -36,6 +36,7 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
 
   const loadNotifications = async () => {
     if (!user) return;
@@ -68,8 +69,36 @@ function App() {
     if (route === '/admin' && !isAdmin) navigate('/discover');
   }, [loading, user, profile, isAdmin, route]);
   useEffect(() => {
-    if (window.location.search.includes('payment=callback')) setShowWalletModal(true);
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') !== 'subscription') return;
+    const status = params.get('status');
+    const transactionId = params.get('transaction_id');
+    const txRef = params.get('tx_ref') || sessionStorage.getItem('flirthub_subscription_tx_ref');
+    if (status === 'cancelled' || status === 'failed') {
+      setPaymentMessage('Payment was not completed. Your Premium access was not activated.');
+      sessionStorage.removeItem('flirthub_subscription_tx_ref');
+      return;
+    }
+    if (!transactionId || !txRef) {
+      setPaymentMessage('Payment returned without a valid transaction reference.');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.functions.invoke('verify-subscription-payment', {
+        body: { tx_ref: txRef, transaction_id: transactionId },
+      });
+      if (cancelled) return;
+      if (error || !data?.success) {
+        setPaymentMessage(data?.error || error?.message || 'Payment verification failed. Premium was not activated.');
+        return;
+      }
+      sessionStorage.removeItem('flirthub_subscription_tx_ref');
+      await refreshSubscription();
+      if (!cancelled) setPaymentMessage('Payment verified successfully. Premium is now active.');
+    })();
+    return () => { cancelled = true; };
+  }, [refreshSubscription]);
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50"><Loader2 className="w-10 h-10 text-rose-500 animate-spin" /></div>;
   if (!user && route !== '/reset-password') return <AuthPage />;
   if (route === '/reset-password') return <PasswordResetPage />;
@@ -96,6 +125,7 @@ function App() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100"><div><h3 className="font-bold text-gray-900">Notifications</h3><p className="text-xs text-gray-500">{unreadCount} unread</p></div><button onClick={markAllNotificationsRead} className="flex items-center gap-1 text-xs font-semibold text-rose-600"><CheckCheck className="w-4 h-4" /> Mark all read</button></div>
         <div className="max-h-[60vh] overflow-y-auto">{notifications.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">No notifications yet.</div> : notifications.map((n) => <button key={n.id} onClick={() => markNotificationRead(n.id)} className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-rose-50 ${n.read_at ? 'opacity-60' : 'bg-rose-50/60'}`}><div className="flex items-start gap-3"><div className="mt-0.5 w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center"><Bell className="w-4 h-4 text-rose-500" /></div><div className="min-w-0 flex-1"><div className="font-semibold text-sm text-gray-900">{n.title}</div><div className="text-xs text-gray-600 mt-0.5">{n.body}</div><div className="text-[10px] text-gray-400 mt-1">{new Date(n.created_at).toLocaleString()}</div></div>{!n.read_at && <span className="w-2 h-2 rounded-full bg-rose-500 mt-2" />}</div></button>)}</div>
       </div>}
+      {paymentMessage && <div className="fixed inset-x-4 top-20 z-50 max-w-md mx-auto rounded-2xl bg-white border border-gray-100 shadow-xl px-4 py-3 text-sm font-medium text-gray-800">{paymentMessage}<button onClick={() => setPaymentMessage(null)} className="ml-3 text-rose-600 font-bold">×</button></div>}
       <main className="pb-20">{activeTab === 'discover' && <DiscoverPage />}{activeTab === 'matches' && <MatchesPage onBack={() => navigate('/discover')} />}{activeTab === 'rooms' && <RoomsPage onBack={() => navigate('/discover')} />}</main>
       <nav className="fixed bottom-0 inset-x-0 z-30 bg-white/90 backdrop-blur-lg border-t border-gray-100"><div className="max-w-md mx-auto flex items-center justify-around px-4 py-2">
         <button onClick={() => navigate('/discover')} className={`flex flex-col items-center gap-0.5 py-1.5 px-4 rounded-xl ${activeTab === 'discover' ? 'text-rose-600' : 'text-gray-400'}`}><Heart className="w-6 h-6" fill={activeTab === 'discover' ? 'currentColor' : 'none'} /><span className="text-xs font-medium">Discover</span></button>
