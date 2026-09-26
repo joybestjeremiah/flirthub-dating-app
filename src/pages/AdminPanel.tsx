@@ -55,6 +55,9 @@ export default function AdminPanel({ onBack }: Props) {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [walletAmount, setWalletAmount] = useState('');
+  const [walletReason, setWalletReason] = useState('');
+  const [walletBusy, setWalletBusy] = useState(false);
   const [paymentSearch, setPaymentSearch] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'all' | 'successful' | 'pending' | 'failed' | 'expired'>('all');
   const [paymentRange, setPaymentRange] = useState<'7' | '30' | '365' | 'all'>('30');
@@ -249,6 +252,19 @@ export default function AdminPanel({ onBack }: Props) {
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     setSelectedUser(null);
     loadStats();
+  };
+
+  const handleCreditWallet = async () => {
+    if (!selectedUser) return;
+    const amount = Number(walletAmount);
+    if (!Number.isFinite(amount) || amount <= 0) { setActionError('Enter a valid credit amount.'); return; }
+    if (!confirm(`Credit ₦${amount.toLocaleString()} to ${selectedUser.display_name}?`)) return;
+    setWalletBusy(true); setActionError(null);
+    const { error } = await supabase.rpc('admin_credit_wallet', { p_user_id: selectedUser.id, p_amount: amount, p_reason: walletReason.trim() || null });
+    setWalletBusy(false);
+    if (error) { setActionError(error.message); return; }
+    setWalletAmount(''); setWalletReason('');
+    alert(`₦${amount.toLocaleString()} credited successfully.`);
   };
 
   const handleToggleAdmin = async (user: AdminUser) => {
@@ -718,6 +734,13 @@ export default function AdminPanel({ onBack }: Props) {
                   ({selectedUser.subscription.plan === 'weekly' ? '7 Days' : '1 Month'})
                 </p>
               )}
+            </div>
+
+            <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+              <div className="text-sm font-semibold text-emerald-900 mb-2">Manual Wallet Credit</div>
+              <input type="number" min="1" step="0.01" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} placeholder="Amount (NGN)" className="w-full mb-2 px-3 py-2.5 rounded-xl border border-emerald-200 bg-white text-sm outline-none" />
+              <input type="text" maxLength={200} value={walletReason} onChange={(e) => setWalletReason(e.target.value)} placeholder="Reason (optional)" className="w-full mb-2 px-3 py-2.5 rounded-xl border border-emerald-200 bg-white text-sm outline-none" />
+              <button onClick={handleCreditWallet} disabled={walletBusy || actionBusy} className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-sm disabled:opacity-50">{walletBusy ? 'Crediting...' : 'Credit Customer Wallet'}</button>
             </div>
 
             <div className="space-y-2">
