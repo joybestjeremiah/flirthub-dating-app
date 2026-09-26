@@ -20,28 +20,18 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
     if (!user || !selectedPlan) return;
     setBusy(true);
     setError(null);
-
-    const days = PLAN_DURATIONS[selectedPlan];
-    const expires = new Date();
-    expires.setDate(expires.getDate() + days);
-
-    const { error: insertError } = await supabase.from('subscriptions').insert({
-      user_id: user.id,
-      plan: selectedPlan,
-      amount: PLAN_PRICES[selectedPlan],
-      status: 'pending',
-      starts_at: new Date().toISOString(),
-      expires_at: expires.toISOString(),
-    });
-
-    setBusy(false);
-    if (insertError) {
-      setError(insertError.message);
-      return;
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('create-subscription-payment', {
+        body: { plan: selectedPlan },
+      });
+      if (fnError) throw fnError;
+      if (!data?.checkoutUrl || !data?.txRef) throw new Error(data?.error ?? 'Unable to start payment.');
+      sessionStorage.setItem('flirthub_subscription_tx_ref', data.txRef);
+      window.location.assign(data.checkoutUrl);
+    } catch (e) {
+      setBusy(false);
+      setError(e instanceof Error ? e.message : 'Unable to start payment.');
     }
-    setSuccess(true);
-    await refreshSubscription();
-    setTimeout(onClose, 1800);
   };
 
   return (
@@ -73,8 +63,8 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-3">
                 <Check className="w-8 h-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Request Submitted!</h3>
-              <p className="text-gray-500 text-sm mt-1">Your subscription is pending admin approval.</p>
+              <h3 className="text-lg font-bold text-gray-900">Payment Started</h3>
+              <p className="text-gray-500 text-sm mt-1">Complete the secure Flutterwave checkout to activate Premium.</p>
             </div>
           ) : (
             <>
