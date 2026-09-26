@@ -28,10 +28,22 @@ export default function MatchesPage({ onBack }: Props) {
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [unmatchingId, setUnmatchingId] = useState<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadMatches();
     if (!user) return;
+    const presence = supabase.channel('flirthub-presence', { config: { presence: { key: user.id } } });
+    const syncPresence = () => {
+      const state = presence.presenceState<{ userId: string }>();
+      const ids = new Set<string>();
+      Object.values(state).forEach((entries) => entries.forEach((entry) => ids.add(entry.userId)));
+      setOnlineUsers(ids);
+    };
+    presence.on('presence', { event: 'sync' }, syncPresence).on('presence', { event: 'join' }, syncPresence).on('presence', { event: 'leave' }, syncPresence).subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') await presence.track({ userId: user.id, onlineAt: new Date().toISOString() });
+    });
+
     const channel = supabase
       .channel('matches-unread')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
@@ -53,7 +65,7 @@ export default function MatchesPage({ onBack }: Props) {
         ));
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(presence); };
   }, [user?.id, activeMatch?.id]);
 
   const loadMatches = async () => {
@@ -261,6 +273,7 @@ export default function MatchesPage({ onBack }: Props) {
 
 function ChatView({
   match,
+  isOtherOnline,
   onBack,
   onCall,
   onGift,
@@ -269,6 +282,7 @@ function ChatView({
   onBack: () => void;
   onCall: (type: 'audio' | 'video') => void;
   onGift: () => void;
+  isOtherOnline: boolean;
 }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -387,7 +401,7 @@ function ChatView({
         </div>
         <div className="flex-1">
           <div className="font-semibold text-gray-900">{other?.display_name}</div>
-          {other?.online && <div className="text-xs text-green-500">Online</div>}
+          {isOtherOnline ? <div className="text-xs text-green-500">Online now</div> : <div className="text-xs text-gray-400">Offline</div>}
         </div>
         <button onClick={() => onCall('audio')} className="p-2 text-gray-500 hover:text-rose-500 transition-colors">
           <Phone className="w-5 h-5" />
