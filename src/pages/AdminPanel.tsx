@@ -16,6 +16,7 @@ import {
   X,
   CheckCircle,
   XCircle,
+  Wallet,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -36,7 +37,7 @@ interface AdminUser extends Profile {
   subscription?: Subscription | null;
 }
 
-type AdminTab = 'overview' | 'payments' | 'users' | 'subscriptions' | 'rooms' | 'reports';
+type AdminTab = 'overview' | 'payments' | 'users' | 'subscriptions' | 'rooms' | 'reports' | 'withdrawals';
 
 interface Props {
   onBack: () => void;
@@ -61,6 +62,7 @@ export default function AdminPanel({ onBack }: Props) {
   const [paymentSearch, setPaymentSearch] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'all' | 'successful' | 'pending' | 'failed' | 'expired'>('all');
   const [paymentRange, setPaymentRange] = useState<'7' | '30' | '365' | 'all'>('30');
+  const [withdrawals, setWithdrawals] = useState<Array<{id:string;host_id:string;amount:number;status:string;payout_method:string;account_name:string;account_number:string;bank_name:string|null;requested_at:string;admin_note:string|null}>>([]);
 
   useEffect(() => {
     loadAll();
@@ -68,7 +70,7 @@ export default function AdminPanel({ onBack }: Props) {
 
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadStats(), loadUsers(), loadSubscriptions(), loadRooms(), loadReports()]);
+    await Promise.all([loadStats(), loadUsers(), loadSubscriptions(), loadRooms(), loadReports(), loadWithdrawals()]);
     setLoading(false);
   };
 
@@ -144,6 +146,21 @@ export default function AdminPanel({ onBack }: Props) {
     );
 
     setSubscriptions(enriched);
+  };
+
+  const loadWithdrawals = async () => {
+    const { data } = await supabase.from('host_withdrawals').select('*').order('requested_at', { ascending: false }).limit(100);
+    setWithdrawals((data || []) as typeof withdrawals);
+  };
+
+  const processWithdrawal = async (id: string, status: 'paid' | 'rejected') => {
+    const note = prompt(status === 'paid' ? 'Optional payout note:' : 'Reason for rejection:') || null;
+    if (status === 'rejected' && !note) return;
+    setActionBusy(true); setActionError(null);
+    const { error } = await supabase.rpc('admin_process_host_withdrawal', { p_withdrawal_id: id, p_status: status, p_admin_note: note });
+    setActionBusy(false);
+    if (error) { setActionError(error.message); return; }
+    await loadWithdrawals();
   };
 
   const loadReports = async () => {
@@ -354,6 +371,7 @@ export default function AdminPanel({ onBack }: Props) {
             { key: 'subscriptions', label: 'Subscriptions', icon: Crown },
             { key: 'rooms', label: 'Rooms', icon: DoorOpen },
             { key: 'reports', label: 'Reports', icon: Shield },
+            { key: 'withdrawals', label: 'Withdrawals', icon: Wallet },
           ] as { key: AdminTab; label: string; icon: typeof Users }[]).map((t) => (
             <button
               key={t.key}
@@ -407,6 +425,13 @@ export default function AdminPanel({ onBack }: Props) {
                 {paymentRows.length===0&&<tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">No matching transactions.</td></tr>}
               </tbody></table>
             </div>
+          </div>
+        )}
+
+        {tab === 'withdrawals' && (
+          <div>
+            <div className="flex items-center justify-between mb-4"><div><h2 className="text-xl font-bold text-gray-900">Host Withdrawals</h2><p className="text-sm text-gray-500 mt-1">Review and process host payout requests.</p></div><button onClick={loadWithdrawals} className="text-sm text-rose-600 font-semibold">Refresh</button></div>
+            <div className="space-y-3">{withdrawals.length === 0 ? <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-sm text-gray-400">No withdrawal requests.</div> : withdrawals.map(w => <div key={w.id} className="bg-white rounded-2xl border border-gray-100 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-bold text-gray-900">₦{Number(w.amount).toLocaleString()}</div><div className="text-xs text-gray-500 mt-1">{w.account_name} · {w.account_number} · {w.bank_name || 'Bank not specified'}</div><div className="text-xs text-gray-400 mt-1">{new Date(w.requested_at).toLocaleString()}</div></div><span className="text-xs font-semibold px-2 py-1 rounded-lg bg-gray-100 text-gray-600 capitalize">{w.status}</span></div>{w.status === 'pending' && <div className="flex gap-2 mt-3"><button disabled={actionBusy} onClick={() => processWithdrawal(w.id,'paid')} className="px-4 py-2 rounded-xl bg-green-600 text-white text-xs font-semibold disabled:opacity-50">Mark Paid</button><button disabled={actionBusy} onClick={() => processWithdrawal(w.id,'rejected')} className="px-4 py-2 rounded-xl bg-red-50 text-red-700 text-xs font-semibold disabled:opacity-50">Reject</button></div>}{w.admin_note && <div className="text-xs text-gray-500 mt-2">Note: {w.admin_note}</div>}</div>)}</div>
           </div>
         )}
 
