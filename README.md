@@ -2,6 +2,10 @@
 
 A modern dating application built with React, TypeScript, Vite, Tailwind CSS, and Supabase.
 
+## Production
+
+FlirtHub is deployed through Vercel from the `main` branch. Keep all browser-exposed Supabase configuration limited to the publishable/anon key; service-role secrets belong only in server-side Edge Functions.
+
 ## Features
 
 - **Discover** — Swipe through profiles, like or pass on potential matches
@@ -67,26 +71,15 @@ npm run build
 
 ```
 src/
-├── App.tsx                  # Main app component with routing
-├── main.tsx                 # Entry point
-├── index.css                # Global styles
+├── App.tsx
+├── main.tsx
+├── index.css
 ├── components/
-│   ├── CallModal.tsx        # Voice/video call modal
-│   └── SubscriptionModal.tsx # Premium subscription modal
 ├── context/
-│   └── AuthContext.tsx      # Authentication context provider
 ├── lib/
-│   ├── supabase.ts          # Supabase client setup
-│   └── types.ts             # TypeScript type definitions
 └── pages/
-    ├── AuthPage.tsx         # Sign in / Sign up
-    ├── ProfileSetup.tsx     # Profile creation and editing
-    ├── DiscoverPage.tsx     # Swipe through profiles
-    ├── MatchesPage.tsx      # Matches list and chat
-    ├── RoomsPage.tsx        # Group chat rooms
-    └── AdminPanel.tsx       # Admin dashboard
 supabase/
-└── migrations/              # Database schema and RLS policies
+└── migrations/
 ```
 
 ## License
