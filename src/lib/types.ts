@@ -35,6 +35,7 @@ export interface Message {
   content: string;
   message_type: 'text' | 'image';
   media_url: string | null;
+  media_path: string | null;
   read: boolean;
   created_at: string;
 }
