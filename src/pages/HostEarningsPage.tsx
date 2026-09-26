@@ -14,6 +14,7 @@ export default function HostEarningsPage({ onBack }: { onBack: () => void }) {
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [bankName, setBankName] = useState('');
+  const [bankCode, setBankCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);\n  const [ledger, setLedger] = useState<Array<{ id: string; gross_amount: number; platform_fee: number; net_amount: number; created_at: string }>>([]);
 
@@ -34,11 +35,11 @@ export default function HostEarningsPage({ onBack }: { onBack: () => void }) {
     if (!Number.isFinite(value) || value < 5000) { setMessage('Minimum withdrawal is ₦5,000.'); return; }
     setBusy(true); setMessage(null);
     const { error } = await supabase.rpc('request_host_withdrawal', {
-      p_amount: value, p_payout_method: 'bank', p_account_name: accountName, p_account_number: accountNumber, p_bank_name: bankName || null,
+      p_amount: value, p_payout_method: 'bank', p_account_name: accountName, p_account_number: accountNumber, p_bank_name: bankName || null, p_bank_code: bankCode,
     });
     setBusy(false);
     if (error) { setMessage(error.message); return; }
-    setAmount(''); setAccountName(''); setAccountNumber(''); setBankName('');
+    setAmount(''); setAccountName(''); setAccountNumber(''); setBankName(''); setBankCode('');
     setMessage('Withdrawal request submitted. Your earnings are reserved while it is reviewed.');
     await load();
   };
@@ -60,6 +61,7 @@ export default function HostEarningsPage({ onBack }: { onBack: () => void }) {
           <input required value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder="Account name" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm" />
           <input required value={accountNumber} onChange={e=>setAccountNumber(e.target.value)} placeholder="Account number" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm" />
           <input value={bankName} onChange={e=>setBankName(e.target.value)} placeholder="Bank name" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm" />
+          <input required value={bankCode} onChange={e=>setBankCode(e.target.value)} placeholder="Paystack bank code" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm" />
           <button disabled={busy} className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold disabled:opacity-50">{busy ? 'Submitting...' : 'Request payout'}</button>
         </form>
       </div>
