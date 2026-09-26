@@ -20,6 +20,8 @@ jobs:
       SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
       SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
       SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+      SMOKE_PREMIUM_EMAIL: ${{ secrets.SMOKE_PREMIUM_EMAIL }}
+      SMOKE_PREMIUM_PASSWORD: ${{ secrets.SMOKE_PREMIUM_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +34,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install Playwright test runner
+        run: npm install --no-save @playwright/test@latest
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
