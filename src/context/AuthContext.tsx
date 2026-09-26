@@ -14,6 +14,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  resendVerification: () => Promise<{ error: string | null }>;
   updatePassword: (password: string) => Promise<{ error: string | null }>;
   deleteAccount: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -111,6 +112,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   };
 
+  const resendVerification = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user?.email) return { error: 'No email address is associated with this account.' };
+    const { error } = await supabase.auth.resend({ type: 'signup', email: data.user.email });
+    return { error: error?.message ?? null };
+  };
+
   const updatePassword = async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     return { error: error?.message ?? null };
@@ -155,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signIn,
         resetPassword,
+        resendVerification,
         updatePassword,
         deleteAccount,
         signOut,
