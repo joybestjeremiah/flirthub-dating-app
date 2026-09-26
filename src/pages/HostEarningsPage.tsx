@@ -15,16 +15,16 @@ export default function HostEarningsPage({ onBack }: { onBack: () => void }) {
   const [accountNumber, setAccountNumber] = useState('');
   const [bankName, setBankName] = useState('');
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);\n  const [ledger, setLedger] = useState<Array<{ id: string; gross_amount: number; platform_fee: number; net_amount: number; created_at: string }>>([]);
 
   const load = async () => {
     if (!user) return;
-    const [{ data: e }, { data: w }] = await Promise.all([
+    const [{ data: e }, { data: w }, { data: l }] = await Promise.all([
       supabase.from('host_earnings').select('available_balance,lifetime_earned,lifetime_withdrawn').eq('user_id', user.id).maybeSingle(),
-      supabase.from('host_withdrawals').select('id,amount,status,payout_method,account_name,account_number,bank_name,requested_at,admin_note').eq('host_id', user.id).order('requested_at', { ascending: false }).limit(20),
+      supabase.from('host_withdrawals').select('id,amount,status,payout_method,account_name,account_number,bank_name,requested_at,admin_note').eq('host_id', user.id).order('requested_at', { ascending: false }).limit(20),\n      supabase.from('host_earning_ledger').select('id,gross_amount,platform_fee,net_amount,created_at').eq('host_id', user.id).order('created_at', { ascending: false }).limit(30),
     ]);
     setEarnings((e as Earnings | null) ?? { available_balance: 0, lifetime_earned: 0, lifetime_withdrawn: 0 });
-    setWithdrawals((w || []) as Withdrawal[]);
+    setWithdrawals((w || []) as Withdrawal[]);\n    setLedger((l || []) as typeof ledger);
   };
   useEffect(() => { load(); }, [user?.id]);
 
