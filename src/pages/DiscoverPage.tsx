@@ -34,7 +34,7 @@ export default function DiscoverPage() {
       { data: passesData, error: passesError },
       { data: blocksData, error: blocksError },
     ] = await Promise.all([
-      supabase.from('profiles').select('*').neq('id', user.id),
+      supabase.from('profiles').select('*').neq('id', user.id).eq('is_visible', true),
       supabase.from('likes').select('to_user').eq('from_user', user.id),
       supabase.from('passes').select('to_user').eq('from_user', user.id),
       supabase.from('blocks').select('blocked').eq('blocker', user.id),
