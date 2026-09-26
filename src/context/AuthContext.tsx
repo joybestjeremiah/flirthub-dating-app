@@ -13,6 +13,9 @@ interface AuthContextValue {
   loading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
+  deleteAccount: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
@@ -101,6 +104,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   };
 
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    return { error: error?.message ?? null };
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  };
+
+  const deleteAccount = async () => {
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (!currentSession) return { error: 'You are not signed in.' };
+    const { error } = await supabase.functions.invoke('delete-account', {
+      headers: { Authorization: `Bearer ${currentSession.access_token}` },
+    });
+    if (error) return { error: error.message };
+    await supabase.auth.signOut({ scope: 'local' });
+    setProfile(null);
+    setSubscription(null);
+    return { error: null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -126,6 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signUp,
         signIn,
+        resetPassword,
+        updatePassword,
+        deleteAccount,
         signOut,
         refreshProfile,
         refreshSubscription,
