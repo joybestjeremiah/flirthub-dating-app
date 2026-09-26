@@ -33,6 +33,8 @@ export interface Message {
   match_id: string;
   sender: string;
   content: string;
+  message_type: 'text' | 'image';
+  media_url: string | null;
   read: boolean;
   created_at: string;
 }
