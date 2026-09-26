@@ -15,6 +15,8 @@ export default function DiscoverPage() {
   const [matchedProfile, setMatchedProfile] = useState<Profile | null>(null);
   const [maxAge, setMaxAge] = useState(99);
   const [cityFilter, setCityFilter] = useState('');
+  const [showSafety, setShowSafety] = useState(false);
+  const [reportReason, setReportReason] = useState('');
 
   useEffect(() => {
     loadProfiles();
@@ -105,6 +107,19 @@ export default function DiscoverPage() {
     setLikedIds((prev) => new Set(prev).add(target.id));
     setCurrentIdx((prev) => prev + 1);
     setActionLoading(false);
+  };
+
+  const handleSafetyAction = async (action: 'block' | 'report') => {
+    if (!user || !current) return;
+    if (action === 'block') {
+      const { error } = await supabase.from('blocks').insert({ blocker: user.id, blocked: current.id });
+      if (error) { console.error(error); return; }
+      setShowSafety(false); setCurrentIdx((prev) => prev + 1); return;
+    }
+    if (!reportReason) return;
+    const { error } = await supabase.from('reports').insert({ reporter: user.id, reported: current.id, reason: reportReason });
+    if (error) { console.error(error); return; }
+    setShowSafety(false); setReportReason(''); setCurrentIdx((prev) => prev + 1);
   };
 
   const handlePass = async () => {
@@ -229,7 +244,7 @@ export default function DiscoverPage() {
             )}
           </div>
 
-          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 left-4 z-10"><button onClick={() => setShowSafety(true)} className="px-3 py-1.5 rounded-full bg-black/50 text-white text-xs backdrop-blur">••• Safety</button></div>\n          <div className="absolute top-4 right-4">
             {current.online ? (
               <span className="flex items-center gap-1.5 bg-green-500/90 text-white text-xs font-medium px-3 py-1 rounded-full backdrop-blur">
                 <span className="w-2 h-2 bg-white rounded-full" />
