@@ -37,7 +37,7 @@ function App() {
   useEffect(() => { if (!user) return; void loadNotifications(); const timer = window.setInterval(() => void loadNotifications(), 15000); return () => window.clearInterval(timer); }, [user?.id]);
   const unreadCount = notifications.filter((n) => !n.read_at).length;
   const markNotificationRead = async (id: string) => { const now = new Date().toISOString(); await supabase.from('notifications').update({ read_at: now }).eq('id', id); setNotifications((items) => items.map((n) => n.id === id ? { ...n, read_at: now } : n)); };
-  const markAllNotificationsRead = async () => { if (!user || unreadCount === 0) return; const now = new Date().toISOString(); await supabase.from('notifications').update({ read_at: now }).eq('user_id', user.id).is('read_at', null); setNotifications((items) => items.map((n) => ({ ...n, read_at: n.read_at ?? now })))); };
+  const markAllNotificationsRead = async () => { if (!user || unreadCount === 0) return; const now = new Date().toISOString(); await supabase.from('notifications').update({ read_at: now }).eq('user_id', user.id).is('read_at', null); setNotifications((items) => items.map((n) => ({ ...n, read_at: n.read_at ?? now }))); };
   useEffect(() => { if (loading) return; if (!user) { if (route !== '/' && route !== '/reset-password') navigate('/'); return; } if (!profile) { if (route !== '/profile-setup' && route !== '/reset-password') navigate('/profile-setup'); return; } if (route === '/' || route === '/profile-setup') navigate('/discover'); if (route === '/admin' && !isAdmin) navigate('/discover'); }, [loading, user, profile, isAdmin, route]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search); if (params.get('payment') !== 'subscription') return;
