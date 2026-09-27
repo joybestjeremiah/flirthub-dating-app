@@ -1,10 +1,90 @@
 import { useEffect, useState } from 'react';
-import { Camera, Loader2, Check, LogOut, Trash2, MailCheck, RefreshCw, Navigation, ImagePlus, X, Star } from 'lucide-react';
+import { Loader2, Check, LogOut, Trash2, MailCheck, RefreshCw, Navigation, ImagePlus, X, Star } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { navigate } from '@/App';
 
 interface GalleryImage { id: string; path: string; is_primary: boolean; sort_order: number; url: string; }
+
+const MAX_PHOTOS = 2;
+const MAX_IMAGE_BYTES = 300 * 1024;
+
+async function compressImage(file: File): Promise<File> {
+  if (file.size <= MAX_IMAGE_BYTES && file.type === 'image/jpeg') return file;
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      let width = image.naturalWidth;
+      let height = image.naturalHeight;
+      const maxDimension = 1600;
+      const initialScale = Math.min(1, maxDimension / Math.max(width, height));
+      width = Math.max(1, Math.round(width * initialScale));
+      height = Math.max(1, Math.round(height * initialScale));
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('Your browser could not process this image.'));
+        return;
+      }
+
+      const render = () => {
+        canvas.width = width;
+        canvas.height = height;
+        context.clearRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+      };
+
+      let quality = 0.82;
+      let attempts = 0;
+
+      const tryCompress = () => {
+        render();
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Unable to compress this image.'));
+            return;
+          }
+
+          if (blob.size <= MAX_IMAGE_BYTES) {
+            resolve(new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, { type: 'image/jpeg' }));
+            return;
+          }
+
+          attempts += 1;
+          if (quality > 0.42) {
+            quality -= 0.07;
+            tryCompress();
+            return;
+          }
+
+          if (Math.max(width, height) > 700 && attempts < 14) {
+            width = Math.max(1, Math.round(width * 0.8));
+            height = Math.max(1, Math.round(height * 0.8));
+            quality = 0.72;
+            tryCompress();
+            return;
+          }
+
+          reject(new Error('This photo could not be reduced below 300KB. Please choose another photo.'));
+        }, 'image/jpeg', quality);
+      };
+
+      tryCompress();
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Invalid image file.'));
+    };
+    image.src = objectUrl;
+  });
+}
 
 export default function ProfileSetup() {
   const { user, profile, refreshProfile, signOut, deleteAccount, resendVerification } = useAuth();
@@ -48,22 +128,26 @@ export default function ProfileSetup() {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
     if (!files.length) return;
-    if (gallery.length + files.length > 6) { setError('You can have up to 6 profile photos.'); return; }
-    const invalid = files.find((file) => !file.type.startsWith('image/') || file.size > 8 * 1024 * 1024);
-    if (invalid) { setError('Use image files only, up to 8MB each.'); return; }
+    if (gallery.length + files.length > MAX_PHOTOS) { setError(`You can have a maximum of ${MAX_PHOTOS} profile photos.`); return; }
+    if (files.some((file) => !file.type.startsWith('image/'))) { setError('Use image files only.'); return; }
+
     setUploading(true); setError(null);
     try {
       const newImages: GalleryImage[] = [];
-      for (const file of files) {
-        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from('profile-images').upload(path, file, { contentType: file.type, cacheControl: '3600', upsert: false });
+      for (const originalFile of files) {
+        const file = await compressImage(originalFile);
+        if (file.size > MAX_IMAGE_BYTES) throw new Error('Each photo must be 300KB or smaller.');
+
+        const path = `${user.id}/${crypto.randomUUID()}.jpg`;
+        const { error: uploadError } = await supabase.storage.from('profile-images').upload(path, file, { contentType: 'image/jpeg', cacheControl: '3600', upsert: false });
         if (uploadError) throw uploadError;
+
         const isPrimary = gallery.length === 0 && newImages.length === 0;
         const { data, error: rowError } = await supabase.from('profile_images').insert({ user_id: user.id, path, is_primary: isPrimary, sort_order: gallery.length + newImages.length }).select('id,path,is_primary,sort_order').single();
         if (rowError) { await supabase.storage.from('profile-images').remove([path]); throw rowError; }
         newImages.push({ ...data, url: publicUrl(path) } as GalleryImage);
       }
+
       const updated = [...gallery, ...newImages];
       setGallery(updated);
       if (!photoUrl && updated[0]) {
@@ -124,17 +208,18 @@ export default function ProfileSetup() {
 
   const handleResendVerification = async () => { setVerificationBusy(true); setVerificationMessage(null); setError(null); const { error } = await resendVerification(); setVerificationBusy(false); setVerificationMessage(error ? error : 'Verification email sent. Check your inbox and spam folder.'); };
   const handleDeleteAccount = async () => { if (!window.confirm('Delete your FlirtHub account permanently? This cannot be undone.')) return; setDeleting(true); setError(null); const { error } = await deleteAccount(); setDeleting(false); if (error) setError(error); };
+  const exitProfile = () => navigate('/discover');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50 py-10 px-4"><div className="max-w-lg mx-auto">
-      <div className="flex justify-end mb-4"><button onClick={signOut} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><LogOut className="w-4 h-4" /> Sign out</button></div>
+      <div className="flex items-center justify-between mb-4"><button type="button" onClick={exitProfile} className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-rose-600">← Back to Discover</button><button type="button" onClick={signOut} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><LogOut className="w-4 h-4" /> Sign out</button></div>
       <div className="text-center mb-8"><h1 className="text-2xl font-bold text-gray-900">{profile ? 'Edit Your Profile' : 'Set Up Your Profile'}</h1><p className="text-gray-500 mt-1">Let others know who you are</p></div>
       {!user?.email_confirmed_at && <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"><div className="flex gap-3"><MailCheck className="w-5 h-5 text-amber-600 mt-0.5" /><div className="flex-1"><p className="text-sm font-semibold text-amber-900">Verify your email address</p><p className="text-xs text-amber-800 mt-1">Verification helps protect your account and improves trust on FlirtHub.</p><button type="button" onClick={handleResendVerification} disabled={verificationBusy} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">{verificationBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Resend verification email</button>{verificationMessage && <p className="text-xs mt-2 text-amber-900">{verificationMessage}</p>}</div></div></div>}
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 space-y-5">
-        <div><div className="flex items-center justify-between mb-2"><label className="text-sm font-medium text-gray-700">Profile photos</label><span className="text-xs text-gray-400">{gallery.length}/6</span></div><div className="grid grid-cols-3 gap-2">
+        <div><div className="flex items-center justify-between mb-2"><label className="text-sm font-medium text-gray-700">Profile photos</label><span className="text-xs text-gray-400">{gallery.length}/{MAX_PHOTOS}</span></div><div className="grid grid-cols-2 gap-2">
           {gallery.map((image) => <div key={image.id} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group"><img src={image.url} alt="Profile" className="w-full h-full object-cover" /><div className="absolute inset-x-1 bottom-1 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><button type="button" title="Make primary" onClick={() => void makePrimary(image)} className="flex-1 rounded-lg bg-white/90 p-2 text-rose-600"><Star className={`w-4 h-4 mx-auto ${image.is_primary ? 'fill-current' : ''}`} /></button><button type="button" title="Remove" onClick={() => void removeImage(image)} className="flex-1 rounded-lg bg-white/90 p-2 text-red-600"><X className="w-4 h-4 mx-auto" /></button></div>{image.is_primary && <span className="absolute top-1 left-1 rounded-full bg-rose-600 text-white text-[10px] px-2 py-1">Main</span>}</div>)}
-          {gallery.length < 6 && <label className="aspect-square rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 flex flex-col items-center justify-center cursor-pointer hover:bg-rose-100"><ImagePlus className="w-7 h-7 text-rose-500" /><span className="text-xs text-rose-600 font-semibold mt-1">{uploading ? 'Uploading…' : 'Add photo'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={uploadImages} disabled={uploading} /></label>}
-        </div><p className="text-xs text-gray-500 mt-2">Upload up to 6 photos. Maximum 8MB each. The main photo is shown on your profile and Discover.</p></div>
+          {gallery.length < MAX_PHOTOS && <label className="aspect-square rounded-xl border-2 border-dashed border-rose-200 bg-rose-50 flex flex-col items-center justify-center cursor-pointer hover:bg-rose-100"><ImagePlus className="w-7 h-7 text-rose-500" /><span className="text-xs text-rose-600 font-semibold mt-1">{uploading ? 'Compressing…' : 'Add photo'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={uploadImages} disabled={uploading} /></label>}
+        </div><p className="text-xs text-gray-500 mt-2">Maximum 2 photos. Each photo is automatically compressed to 300KB or less before upload. The main photo is shown on your profile and Discover.</p></div>
         <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Display Name</label><input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none" placeholder="Your name" /></div>
         <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1.5">Age</label><input type="number" min="18" max="99" value={age} onChange={(e) => setAge(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none" placeholder="25" /></div><div><label className="block text-sm font-medium text-gray-700 mb-1.5">City</label><input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none" placeholder="Lagos" /></div></div>
         <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none bg-white"><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1.5">Interested In</label><select value={interestedIn} onChange={(e) => setInterestedIn(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none bg-white"><option value="all">Everyone</option><option value="male">Men</option><option value="female">Women</option><option value="other">Other</option></select></div></div>
