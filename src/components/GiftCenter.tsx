@@ -4,9 +4,9 @@ import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 
 const PLANS = [
-  { id: 'weekly', label: '7 Days Premium', days: 7 },
-  { id: 'monthly', label: '30 Days Premium', days: 30 },
-  { id: 'quarterly', label: '90 Days Premium', days: 90 },
+  { id: 'weekly', label: '7 Days Premium' },
+  { id: 'monthly', label: '30 Days Premium' },
+  { id: 'quarterly', label: '90 Days Premium' },
 ];
 
 export default function GiftCenter({ onClose }: { onClose: () => void }) {
@@ -36,8 +36,13 @@ export default function GiftCenter({ onClose }: { onClose: () => void }) {
     if (!selected || sending) return;
     setSending(true);
     setMessage(null);
+    const requestId = crypto.randomUUID();
     try {
-      const { data, error } = await supabase.rpc('gift_subscription', { p_recipient_id: selected.id, p_plan: plan });
+      const { data, error } = await supabase.rpc('gift_subscription', {
+        p_recipient_id: selected.id,
+        p_plan: plan,
+        p_request_id: requestId,
+      });
       if (error || !data || data.success === false) {
         setMessage((data?.error as string) || error?.message || 'Gift could not be sent. Check your wallet balance.');
         return;
