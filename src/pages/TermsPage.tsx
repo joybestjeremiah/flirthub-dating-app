@@ -1,0 +1,37 @@
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
+
+type Props = { onBack?: () => void };
+
+export default function TermsPage({ onBack }: Props) {
+  return (
+    <main className="min-h-screen bg-white text-gray-800">
+      <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
+        <button onClick={onBack} className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-rose-600">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+        <div className="flex items-center gap-3 mb-3"><ShieldCheck className="h-7 w-7 text-rose-500" /><h1 className="text-3xl font-bold">FlirtHub Terms & Conditions</h1></div>
+        <p className="text-sm text-gray-500 mb-8">Last updated: September 27, 2026</p>
+
+        <div className="space-y-7 text-sm leading-7">
+          <section><h2 className="text-lg font-bold">1. Acceptance</h2><p>By creating or using a FlirtHub account, you agree to these Terms and our Privacy Policy. If you do not agree, do not use the service.</p></section>
+          <section><h2 className="text-lg font-bold">2. Eligibility — 18+ only</h2><p>FlirtHub is intended only for adults aged 18 or older. You must provide accurate information and must not create an account for another person without permission.</p></section>
+          <section><h2 className="text-lg font-bold">3. Dating and community conduct</h2><p>You must treat other members respectfully. Do not harass, threaten, stalk, impersonate, scam, defraud, exploit, extort, or distribute unlawful, hateful or sexually exploitative material. Do not use FlirtHub to arrange or promote illegal activity, financial fraud, or abuse.</p></section>
+          <section><h2 className="text-lg font-bold">4. Profiles, messages and content</h2><p>You are responsible for content you upload or send. You must have the rights or permission needed to use photos and other content. We may remove content or restrict accounts where reasonably necessary to protect members, comply with law, or enforce these Terms.</p></section>
+          <section><h2 className="text-lg font-bold">5. Safety, blocking and reporting</h2><p>Use the available block and report tools when you encounter abusive, suspicious or unsafe behaviour. FlirtHub does not guarantee the identity, intentions, conduct, background or safety of another member. Never send money or sensitive financial information to another member merely because they ask.</p></section>
+          <section><h2 className="text-lg font-bold">6. Premium subscriptions</h2><p>Premium features are paid services. The price, duration and applicable renewal terms will be shown before purchase. Premium access may be suspended or ended if your account violates these Terms. Where a payment is successfully received but the purchased service is not properly delivered, contact support so the transaction can be investigated and any remedy required by applicable law can be provided.</p></section>
+          <section><h2 className="text-lg font-bold">7. Wallet funding and payments</h2><p>FlirtHub may provide a wallet for eligible in-app transactions. Payments are processed through Paystack. A successful payment is subject to provider verification and our transaction records. Do not attempt chargeback abuse, payment manipulation, duplicate payment claims, or other fraudulent activity. Wallet balances are not a bank account and are not intended to be used as a general money-transfer service.</p></section>
+          <section><h2 className="text-lg font-bold">8. Gifts and virtual gifts</h2><p>Where available, you may use your eligible wallet balance to send Premium or virtual gifts to another member. Gift transactions may be recorded for fraud prevention and transaction history. Gifts are intended for use inside FlirtHub and must not be used for scams, coercion, money laundering or other unlawful activity.</p></section>
+          <section><h2 className="text-lg font-bold">9. Refunds and transaction disputes</h2><p>Refunds and reversals are handled according to the nature of the transaction, applicable law, the displayed purchase terms, and payment-provider rules. If you believe you were charged incorrectly, contact FlirtHub support promptly with the transaction reference. We will investigate verified payment discrepancies.</p></section>
+          <section><h2 className="text-lg font-bold">10. Account suspension and termination</h2><p>We may suspend, restrict or terminate an account where we reasonably believe it is being used for fraud, abuse, unlawful activity, serious safety violations, payment abuse, or repeated breaches of these Terms. Where appropriate, we may preserve relevant records to meet legal, security or dispute-resolution obligations.</p></section>
+          <section><h2 className="text-lg font-bold">11. Privacy</h2><p>Your use of FlirtHub is also governed by our Privacy Policy, which explains how personal information is collected, used, stored and disclosed. We use reasonable security measures, but no online service can guarantee absolute security.</p></section>
+          <section><h2 className="text-lg font-bold">12. Service availability</h2><p>We aim to provide a reliable service but cannot guarantee uninterrupted availability. Features may change, be temporarily unavailable, or be discontinued where reasonably necessary for maintenance, security, legal compliance or product development.</p></section>
+          <section><h2 className="text-lg font-bold">13. Consumer rights</h2><p>Nothing in these Terms is intended to remove rights or remedies that cannot lawfully be excluded. FlirtHub will provide material pricing and service information clearly before applicable payment and will maintain a reasonable complaint and support process.</p></section>
+          <section><h2 className="text-lg font-bold">14. Changes to these Terms</h2><p>We may update these Terms as the service or applicable requirements change. Material changes will be communicated through appropriate in-app or account notices where reasonably practicable. Continued use after an effective update means you accept the updated Terms.</p></section>
+          <section><h2 className="text-lg font-bold">15. Governing law and disputes</h2><p>These Terms are intended to be governed by the laws applicable in Nigeria, subject to any mandatory consumer protections and other rights that apply to you. We encourage users to contact support first so ordinary disputes can be resolved promptly.</p></section>
+          <section><h2 className="text-lg font-bold">16. Contact</h2><p>For account, payment, safety or Terms questions, use the support/contact channel provided inside FlirtHub. When contacting support about a payment, include the relevant transaction reference and a clear description of the issue. Never send your Paystack password, card PIN, OTP or account password to support.</p></section>
+        </div>
+        <div className="mt-10 rounded-2xl bg-rose-50 border border-rose-100 p-4 text-xs leading-6 text-rose-900">This page is a general product Terms template and is not a substitute for advice from a Nigerian-qualified lawyer. Before public launch, replace any missing company/legal contact details and have the final Terms and Privacy Policy reviewed for your exact business model.</div>
+      </div>
+    </main>
+  );
+}
