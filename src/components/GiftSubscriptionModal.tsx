@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Gift, Loader2, X } from 'lucide-react';
+import { Gift, Loader2, X, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PLAN_PRICES, PLAN_LABELS, type PlanKey } from '@/lib/types';
 
@@ -15,41 +15,51 @@ export default function GiftSubscriptionModal({ recipientId, recipientName, onCl
   const [balance, setBalance] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const loadBalance = async () => {
       const { data, error: balanceError } = await supabase
         .from('wallets')
         .select('balance')
         .maybeSingle();
+      if (!mounted) return;
       if (balanceError) setError('Unable to load your wallet balance.');
       else setBalance(Number(data?.balance ?? 0));
     };
     void loadBalance();
+    return () => { mounted = false; };
   }, []);
 
   const sendGift = async () => {
     setBusy(true);
     setError(null);
-    const { error: giftError } = await supabase.rpc('gift_subscription', {
+    const { data, error: giftError } = await supabase.rpc('gift_subscription', {
       p_recipient_id: recipientId,
       p_plan: selectedPlan,
     });
     setBusy(false);
     if (giftError) {
-      setError(giftError.message.includes('Insufficient wallet balance')
+      setError(giftError.message.toLowerCase().includes('insufficient')
         ? 'Insufficient wallet balance.'
         : giftError.message);
       return;
     }
-    onSuccess();
+    if (data?.success === false) {
+      setError(data?.error || 'Unable to send gift.');
+      return;
+    }
+    setSuccess(true);
+    setBalance(prev => prev === null ? prev : Math.max(0, prev - PLAN_PRICES[selectedPlan]));
+    window.setTimeout(onSuccess, 900);
   };
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden">
         <div className="bg-gradient-to-r from-rose-500 to-pink-600 p-5 text-white relative">
-          <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white">
+          <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
           <Gift className="w-8 h-8 mb-2" />
@@ -57,26 +67,36 @@ export default function GiftSubscriptionModal({ recipientId, recipientName, onCl
           <p className="text-sm text-white/80">Send a subscription to {recipientName}</p>
         </div>
         <div className="p-5">
-          <div className="mb-4 rounded-xl bg-gray-50 px-4 py-3 text-sm">
-            Wallet balance: <span className="font-bold">₦{(balance ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="space-y-3">
-            {(['weekly', 'monthly'] as PlanKey[]).map(plan => (
-              <button key={plan} onClick={() => setSelectedPlan(plan)}
-                className={`w-full p-4 rounded-xl border-2 text-left ${selectedPlan === plan ? 'border-rose-500 bg-rose-50' : 'border-gray-200'}`}>
-                <div className="flex justify-between">
-                  <span className="font-semibold">{PLAN_LABELS[plan]}</span>
-                  <span className="font-bold text-rose-600">₦{PLAN_PRICES[plan].toLocaleString()}</span>
-                </div>
+          {success ? (
+            <div className="py-8 text-center">
+              <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+              <h3 className="font-bold text-gray-900">Gift sent!</h3>
+              <p className="text-sm text-gray-500 mt-1">{recipientName} has received {PLAN_LABELS[selectedPlan]} Premium.</p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 rounded-xl bg-gray-50 px-4 py-3 text-sm">
+                Wallet balance: <span className="font-bold">₦{(balance ?? 0).toLocaleString()}</span>
+              </div>
+              <div className="space-y-3">
+                {(['weekly', 'monthly'] as PlanKey[]).map(plan => (
+                  <button key={plan} onClick={() => setSelectedPlan(plan)} disabled={busy}
+                    className={`w-full p-4 rounded-xl border-2 text-left ${selectedPlan === plan ? 'border-rose-500 bg-rose-50' : 'border-gray-200'}`}>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">{PLAN_LABELS[plan]}</span>
+                      <span className="font-bold text-rose-600">₦{PLAN_PRICES[plan].toLocaleString()}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {error && <div className="mt-3 rounded-lg bg-red-50 text-red-600 px-3 py-2 text-sm">{error}</div>}
+              <button onClick={sendGift} disabled={busy || balance === null || balance < PLAN_PRICES[selectedPlan]}
+                className="mt-5 w-full py-3 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gift className="w-5 h-5" />}
+                {balance !== null && balance < PLAN_PRICES[selectedPlan] ? 'Insufficient balance' : 'Send Gift'}
               </button>
-            ))}
-          </div>
-          {error && <div className="mt-3 rounded-lg bg-red-50 text-red-600 px-3 py-2 text-sm">{error}</div>}
-          <button onClick={sendGift} disabled={busy || balance === null}
-            className="mt-5 w-full py-3 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
-            {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gift className="w-5 h-5" />}
-            Send Gift
-          </button>
+            </>
+          )}
         </div>
       </div>
     </div>
