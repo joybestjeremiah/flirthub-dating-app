@@ -1,4 +1,4 @@
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Mail, MessageCircle, ShieldCheck } from 'lucide-react';
 
 type Props = { onBack?: () => void };
 
@@ -28,9 +28,9 @@ export default function TermsPage({ onBack }: Props) {
           <section><h2 className="text-lg font-bold">13. Consumer rights</h2><p>Nothing in these Terms is intended to remove rights or remedies that cannot lawfully be excluded. FlirtHub will provide material pricing and service information clearly before applicable payment and will maintain a reasonable complaint and support process.</p></section>
           <section><h2 className="text-lg font-bold">14. Changes to these Terms</h2><p>We may update these Terms as the service or applicable requirements change. Material changes will be communicated through appropriate in-app or account notices where reasonably practicable. Continued use after an effective update means you accept the updated Terms.</p></section>
           <section><h2 className="text-lg font-bold">15. Governing law and disputes</h2><p>These Terms are intended to be governed by the laws applicable in Nigeria, subject to any mandatory consumer protections and other rights that apply to you. We encourage users to contact support first so ordinary disputes can be resolved promptly.</p></section>
-          <section><h2 className="text-lg font-bold">16. Contact</h2><p>For account, payment, safety or Terms questions, use the support/contact channel provided inside FlirtHub. When contacting support about a payment, include the relevant transaction reference and a clear description of the issue. Never send your Paystack password, card PIN, OTP or account password to support.</p></section>
+          <section><h2 className="text-lg font-bold">16. Contact Admin</h2><p>For account, payment, safety or Terms questions, contact the FlirtHub Admin directly:</p><div className="mt-3 flex flex-col gap-2 sm:flex-row"><a href="mailto:airtimeodogiyon@gmail.com" className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-3 font-semibold text-gray-800 hover:bg-gray-200"><Mail className="h-4 w-4" /> airtimeodogiyon@gmail.com</a><a href="https://wa.me/2347031261521" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-green-50 px-4 py-3 font-semibold text-green-700 hover:bg-green-100"><MessageCircle className="h-4 w-4" /> WhatsApp: +234 703 126 1521</a></div><p className="mt-3">When contacting support about a payment, include the relevant transaction reference and a clear description of the issue. Never send your Paystack password, card PIN, OTP or account password to support.</p></section>
         </div>
-        <div className="mt-10 rounded-2xl bg-rose-50 border border-rose-100 p-4 text-xs leading-6 text-rose-900">This page is a general product Terms template and is not a substitute for advice from a Nigerian-qualified lawyer. Before public launch, replace any missing company/legal contact details and have the final Terms and Privacy Policy reviewed for your exact business model.</div>
+        <div className="mt-10 rounded-2xl bg-rose-50 border border-rose-100 p-4 text-xs leading-6 text-rose-900">This page is a general product Terms template and is not a substitute for advice from a Nigerian-qualified lawyer. Before public launch, have the final Terms and Privacy Policy reviewed for your exact business model.</div>
       </div>
     </main>
   );
