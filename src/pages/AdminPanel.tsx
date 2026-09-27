@@ -47,17 +47,14 @@ export default function AdminPanel({ onBack }: Props) {
     if (!window.confirm(`${action} ${selected.display_name || 'this user'} ${mode === 'credit' ? 'with' : 'by'} ₦${value.toLocaleString()}?`)) return;
     setBusy(true); setMessage(null);
     const rpc = mode === 'credit'
-      ? supabase.rpc('admin_credit_wallet', { p_user_id: selected.user_id, p_amount: value, p_note: note.trim() || 'Admin wallet funding' })
+      ? supabase.rpc('admin_credit_wallet', { p_user_id: selected.user_id, p_amount: value, p_reason: note.trim() || 'Admin wallet funding' })
       : supabase.rpc('admin_debit_wallet', { p_user_id: selected.user_id, p_amount: value, p_reason: note.trim() || 'Admin wallet debit' });
     const { data, error } = await rpc;
     setBusy(false);
     if (error) { setMessage({ ok: false, text: error.message }); return; }
     if (mode === 'credit') {
-      const result = Array.isArray(data) ? data[0] : data;
-      const newBalance = Number(result?.new_balance ?? 0);
-      setSelected((current) => current ? { ...current, balance: newBalance } : current);
-      setUsers((rows) => rows.map((u) => u.user_id === selected.user_id ? { ...u, balance: newBalance } : u));
-      setMessage({ ok: true, text: `Wallet funded successfully. New balance: ₦${newBalance.toLocaleString()}` });
+      setMessage({ ok: true, text: 'Wallet funded successfully.' });
+      await searchUsers();
     } else {
       await searchUsers();
       setMessage({ ok: true, text: 'Wallet debited successfully.' });
