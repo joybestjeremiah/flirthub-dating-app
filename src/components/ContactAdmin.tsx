@@ -1,13 +1,12 @@
 import { Mail, MessageCircle, X, Headphones } from 'lucide-react';
 import { useState } from 'react';
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
-const ADMIN_WHATSAPP = import.meta.env.VITE_ADMIN_WHATSAPP as string | undefined;
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined)?.trim() || 'airtimeodogiyon@gmail.com';
+const ADMIN_WHATSAPP = (import.meta.env.VITE_ADMIN_WHATSAPP as string | undefined)?.trim() || '+2347031261521';
 
 export default function ContactAdmin() {
   const [open, setOpen] = useState(false);
-  const email = ADMIN_EMAIL?.trim();
-  const whatsapp = ADMIN_WHATSAPP?.replace(/[^0-9]/g, '');
+  const whatsapp = ADMIN_WHATSAPP.replace(/[^0-9]/g, '');
 
   return (
     <>
@@ -22,8 +21,14 @@ export default function ContactAdmin() {
               <button type="button" onClick={() => setOpen(false)} className="p-2 text-gray-500 hover:text-gray-900" aria-label="Close"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-5 space-y-3">
-              {email ? <a href={`mailto:${email}`} className="flex items-center gap-3 rounded-xl border p-4 hover:bg-gray-50"><span className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center"><Mail className="w-5 h-5 text-rose-600" /></span><span><span className="block text-xs text-gray-500">Email Admin</span><span className="block font-semibold text-gray-900 break-all">{email}</span></span></a> : <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">Admin email is not configured yet.</div>}
-              {whatsapp ? <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border p-4 hover:bg-gray-50"><span className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center"><MessageCircle className="w-5 h-5 text-green-600" /></span><span><span className="block text-xs text-gray-500">WhatsApp Admin</span><span className="block font-semibold text-gray-900">Chat on WhatsApp</span></span></a> : <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">Admin WhatsApp is not configured yet.</div>}
+              <a href={`mailto:${ADMIN_EMAIL}`} className="flex items-center gap-3 rounded-xl border p-4 hover:bg-gray-50">
+                <span className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center"><Mail className="w-5 h-5 text-rose-600" /></span>
+                <span><span className="block text-xs text-gray-500">Email Admin</span><span className="block font-semibold text-gray-900 break-all">{ADMIN_EMAIL}</span></span>
+              </a>
+              <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border p-4 hover:bg-gray-50">
+                <span className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center"><MessageCircle className="w-5 h-5 text-green-600" /></span>
+                <span><span className="block text-xs text-gray-500">WhatsApp Admin</span><span className="block font-semibold text-gray-900">+234 703 126 1521</span></span>
+              </a>
               <p className="text-[11px] text-gray-400 text-center pt-2">For account, payment, wallet, safety or technical support.</p>
             </div>
           </div>
