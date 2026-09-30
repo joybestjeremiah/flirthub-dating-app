@@ -33,36 +33,16 @@ export interface Notification {
   metadata: Record<string, unknown>;
 }
 
-export interface Like {
-  id: string;
-  from_user: string;
-  to_user: string;
-  created_at: string;
-}
-
-export interface Match {
-  id: string;
-  user1: string;
-  user2: string;
-  created_at: string;
-}
-
-export interface Message {
-  id: string;
-  match_id: string;
-  sender: string;
-  content: string;
-  message_type: 'text' | 'image';
-  media_url: string | null;
-  media_path: string | null;
-  read: boolean;
-  created_at: string;
-}
+export interface Like { id: string; from_user: string; to_user: string; created_at: string; }
+export interface Match { id: string; user1: string; user2: string; created_at: string; }
+export interface Message { id: string; match_id: string; sender: string; content: string; message_type: 'text' | 'image'; media_url: string | null; media_path: string | null; read: boolean; created_at: string; }
 
 export interface Call {
   id: string;
-  match_id: string;
+  match_id: string | null;
+  room_id: string | null;
   caller: string;
+  callee: string | null;
   call_type: string;
   status: string;
   started_at: string;
@@ -73,56 +53,11 @@ export interface Call {
   callee_ice?: RTCIceCandidateInit[];
 }
 
-export interface Room {
-  id: string;
-  name: string;
-  description: string | null;
-  owner: string;
-  created_at: string;
-}
-
-export interface RoomMember {
-  id: string;
-  room_id: string;
-  user_id: string;
-  joined_at: string;
-}
-
-export interface RoomMessage {
-  id: string;
-  room_id: string;
-  sender: string;
-  content: string;
-  created_at: string;
-}
-
-export interface Subscription {
-  id: string;
-  user_id: string;
-  plan: string;
-  amount: number;
-  status: string;
-  starts_at: string;
-  expires_at: string;
-  created_at: string;
-  tx_ref?: string | null;
-  paystack_transaction_id?: string | null;
-  paid_at?: string | null;
-}
-
-export const PLAN_PRICES = {
-  weekly: 700,
-  monthly: 2800,
-};
-
-export const PLAN_DURATIONS = {
-  weekly: 7,
-  monthly: 30,
-};
-
-export const PLAN_LABELS = {
-  weekly: '7 Days',
-  monthly: '1 Month',
-};
-
+export interface Room { id: string; name: string; description: string | null; owner: string; created_at: string; }
+export interface RoomMember { id: string; room_id: string; user_id: string; joined_at: string; }
+export interface RoomMessage { id: string; room_id: string; sender: string; content: string; created_at: string; }
+export interface Subscription { id: string; user_id: string; plan: string; amount: number; status: string; starts_at: string; expires_at: string; created_at: string; tx_ref?: string | null; paystack_transaction_id?: string | null; paid_at?: string | null; }
+export const PLAN_PRICES = { weekly: 700, monthly: 2800 };
+export const PLAN_DURATIONS = { weekly: 7, monthly: 30 };
+export const PLAN_LABELS = { weekly: '7 Days', monthly: '1 Month' };
 export type PlanKey = 'weekly' | 'monthly';
