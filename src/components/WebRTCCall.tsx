@@ -273,7 +273,7 @@ export default function WebRTCCall({ call, role, otherProfile, onClose }: Props)
         void supabase.rpc('cleanup_call_ice_candidates', { p_call_id: call.id });
       }
     };
-  }, [call.id, call.call_type, call.caller, role, onClose]);
+  }, [call.id, call.call_type, role]);
 
   const formatElapsed = (seconds: number) => {
     const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
