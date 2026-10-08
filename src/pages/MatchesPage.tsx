@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, Send, Phone, Video, Loader2, MessageCircle, Gift, HeartOff } from 'lucide-react';
+import { ArrowLeft, Send, Video, Loader2, MessageCircle, Gift, HeartOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Message, Match } from '@/lib/types';
@@ -25,7 +25,6 @@ export default function MatchesPage({ onBack }: Props) {
   const [activeMatch, setActiveMatch] = useState<MatchWithProfile | null>(null);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
-  const [callType, setCallType] = useState<'audio' | 'video'>('audio');
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [unmatchingId, setUnmatchingId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
@@ -130,13 +129,11 @@ export default function MatchesPage({ onBack }: Props) {
     setActiveMatch({ ...match, unreadCount: 0 });
   };
 
-  const handleCallClick = (type: 'audio' | 'video') => {
+  const handleVideoCallClick = () => {
     if (!hasActiveSubscription) {
       setShowSubModal(true);
       return;
     }
-
-    setCallType(type);
     setShowCallModal(true);
   };
 
@@ -175,7 +172,7 @@ export default function MatchesPage({ onBack }: Props) {
             setActiveMatch(null);
             void loadMatches();
           }}
-          onCall={handleCallClick}
+          onVideoCall={handleVideoCallClick}
           onGift={() => setShowGiftModal(true)}
           isOtherOnline={onlineUsers.has(activeMatch.otherProfile.id)}
           canSend={hasActiveSubscription}
@@ -194,8 +191,7 @@ export default function MatchesPage({ onBack }: Props) {
         {showCallModal && (
           <CallModal
             match={activeMatch}
-            callType={callType}
-            onClose={() => setShowCallModal(false)}
+                        onClose={() => setShowCallModal(false)}
           />
         )}
 
@@ -290,7 +286,7 @@ export default function MatchesPage({ onBack }: Props) {
 interface ChatViewProps {
   match: MatchWithProfile;
   onBack: () => void;
-  onCall: (type: 'audio' | 'video') => void;
+  onVideoCall: () => void;
   onGift: () => void;
   isOtherOnline: boolean;
   canSend: boolean;
@@ -300,7 +296,7 @@ interface ChatViewProps {
 function ChatView({
   match,
   onBack,
-  onCall,
+  onVideoCall,
   onGift,
   isOtherOnline,
   canSend,
@@ -420,11 +416,11 @@ function ChatView({
           </div>
         </div>
 
-        <button onClick={() => onCall('audio')} className="p-2 text-gray-500" aria-label="Audio call">
+        <button onClick={() => onVideoCall()} className="p-2 text-gray-500" aria-label="Audio call">
           <Phone className="w-5 h-5" />
         </button>
 
-        <button onClick={() => onCall('video')} className="p-2 text-gray-500" aria-label="Video call">
+        <button onClick={onVideoCall} className="p-2 text-rose-500" aria-label="Video call">
           <Video className="w-5 h-5" />
         </button>
 
