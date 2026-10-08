@@ -416,10 +416,6 @@ function ChatView({
           </div>
         </div>
 
-        <button onClick={() => onVideoCall()} className="p-2 text-gray-500" aria-label="Audio call">
-          <Phone className="w-5 h-5" />
-        </button>
-
         <button onClick={onVideoCall} className="p-2 text-rose-500" aria-label="Video call">
           <Video className="w-5 h-5" />
         </button>
