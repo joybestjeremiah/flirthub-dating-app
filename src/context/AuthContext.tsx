@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('user_id', uid)
       .eq('status', 'active')
-      .gt('expires_at', now)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
       .order('expires_at', { ascending: false })
       .limit(1)
       .maybeSingle();
