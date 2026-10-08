@@ -7,7 +7,7 @@ import SubscriptionModal from '@/components/SubscriptionModal';
 import WebRTCCall from '@/components/WebRTCCall';
 
 interface Props { onBack: () => void; }
-type RoomPerson = Pick<Profile, 'id' | 'display_name' | 'photo_url'>;
+type RoomPerson = { id: string; display_name: string; photo_url: string | null };
 
 export default function RoomsPageV2({ onBack }: Props) {
   const { user, hasActiveSubscription } = useAuth();
@@ -113,7 +113,7 @@ function RoomChat({ room, onBack }: { room: Room; onBack: () => void }) {
       (result.data || []).forEach((p: Profile) => { map[p.id] = p; });
     }
     setProfiles(map);
-    setMembers(((memberResult.data || []) as RoomPerson[]).filter(p => p.id !== user?.id));
+    setMembers(((memberResult.data || []) as Array<{ user_id: string; display_name: string; photo_url: string | null }>).map(p => ({ id: p.user_id, display_name: p.display_name, photo_url: p.photo_url })).filter(p => p.id !== user?.id));
     setLoading(false);
   };
 
