@@ -24,10 +24,12 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (mode === 'reset') setResetSent(false);
     if (mode === 'signup') {
       if (!phone.trim()) { setError('Phone number is required to create a FlirtHub account.'); return; }
       if (!isValidPhone(phone)) { setError('Enter a valid Nigerian phone number, e.g. 08012345678 or +2348012345678.'); return; }
@@ -49,6 +51,7 @@ export default function AuthPage() {
     }
     setBusy(false);
     if (result.error) setError(result.error);
+    else if (mode === 'reset') setResetSent(true);
   };
 
   return (
@@ -62,11 +65,12 @@ export default function AuthPage() {
             {mode === 'signup' && <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Phone number <span className="text-rose-600">*</span></label><div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 outline-none transition-all" placeholder="08012345678" autoComplete="tel" /><p className="text-[11px] text-gray-400 mt-1">Required for your account. No SMS/OTP verification.</p></div></div>}
             {mode !== 'reset' && <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label><div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 outline-none transition-all" placeholder="••••••••" /></div></div>}
             {mode === 'signup' && <label className="flex items-start gap-3 rounded-xl bg-rose-50 border border-rose-100 p-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 h-4 w-4 accent-rose-600" /><span className="text-xs leading-5 text-gray-600">I confirm that I am 18 or older and agree to the <a href="/terms" className="font-semibold text-rose-600 hover:underline">FlirtHub Terms & Conditions</a>, including the rules against pornography, harassment, threats, stalking, impersonation and scams.</span></label>}
-            {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2.5">{error}</div>}
+            {error && <div role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2.5">{error}</div>}
+            {mode === 'reset' && resetSent && <div role="status" className="text-sm text-green-700 bg-green-50 rounded-lg px-4 py-3">If an account exists for this email, a password reset link has been sent. Check your inbox and spam folder, then open the link on this device.</div>}
             <button type="submit" disabled={busy} className="w-full py-3.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold shadow-lg shadow-rose-500/30 hover:shadow-rose-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">{busy && <Loader2 className="w-5 h-5 animate-spin" />}{mode === 'reset' ? 'Send Reset Link' : mode === 'signin' ? 'Sign In' : 'Create Account'}</button>
           </form>
-          {mode === 'signin' && <button type="button" onClick={() => setMode('reset')} className="w-full mt-4 text-sm text-rose-600 hover:underline">Forgot your password?</button>}
-          {mode === 'reset' && <button type="button" onClick={() => setMode('signin')} className="w-full mt-4 text-sm text-gray-600 hover:underline">Back to sign in</button>}
+          {mode === 'signin' && <button type="button" onClick={() => { setError(null); setResetSent(false); setMode('reset'); }} className="w-full mt-4 text-sm text-rose-600 hover:underline">Forgot your password?</button>}
+          {mode === 'reset' && <button type="button" onClick={() => { setError(null); setResetSent(false); setMode('signin'); }} className="w-full mt-4 text-sm text-gray-600 hover:underline">Back to sign in</button>}
           <p className="text-center text-xs text-gray-400 mt-6">By continuing you agree to our Terms & Privacy Policy</p>
         </div>
       </div>
