@@ -75,7 +75,7 @@ export default function DiscoverPage() {
 
   const handleLike = async () => {
     if (!user || actionLoading) return;
-    const target = profiles[currentIdx];
+    const target = visibleProfiles[currentIdx];
     if (!target) return;
 
     setActionLoading(true);
@@ -247,6 +247,7 @@ export default function DiscoverPage() {
           </label>
         </div>
       </div>
+      )}
       {discoveryMode === 'cards' && matchedProfile && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-white rounded-3xl p-7 text-center shadow-2xl">
@@ -339,7 +340,6 @@ export default function DiscoverPage() {
       <p className="text-center text-sm text-gray-400 mt-4">
         {Math.max(0, visibleProfiles.length - currentIdx - 1)} more profiles to discover
       </p></>}
-      )}
     </div>
   );
 }
