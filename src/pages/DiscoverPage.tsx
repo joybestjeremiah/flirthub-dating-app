@@ -20,6 +20,7 @@ export default function DiscoverPage() {
   const [maxDistanceKm, setMaxDistanceKm] = useState(50);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [discoveryMode, setDiscoveryMode] = useState<'cards' | 'popular'>('popular');
 
   useEffect(() => {
     loadProfiles();
@@ -65,7 +66,7 @@ export default function DiscoverPage() {
       const candidate = p as Profile;
       const genderMatches = !me?.interested_in || me.interested_in === 'all' || me.interested_in === candidate.gender;
       const candidateAcceptsMe = !candidate.interested_in || candidate.interested_in === 'all' || candidate.interested_in === me?.gender;
-      return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id) && !blockedSet.has(candidate.id) && (!locationEnabled || distanceById.has(candidate.id));
+      return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id) && !blockedSet.has(candidate.id);
     }) as Profile[];
     setProfiles(filtered.map((p) => ({ ...p, distance_km: distanceById.get(p.id) } as Profile & { distance_km?: number })));
     setLocationMessage(locationEnabled ? null : 'Enable location in your profile to match by distance. City matching remains available.');
@@ -174,10 +175,11 @@ export default function DiscoverPage() {
     (p.age == null || p.age <= maxAge) &&
     (!cityFilter.trim() || (p.city ?? '').toLowerCase().includes(cityFilter.trim().toLowerCase()))
   );
+  const popularProfiles = [...visibleProfiles].sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online)) || (a.display_name ?? '').localeCompare(b.display_name ?? ''));
   const current = visibleProfiles[currentIdx];
   const currentDistance = (current as Profile & { distance_km?: number } | undefined)?.distance_km;
 
-  if (!current) {
+  if (!current && discoveryMode !== 'popular') {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
         <div className="w-20 h-20 rounded-full bg-rose-100 flex items-center justify-center mb-4">
@@ -197,6 +199,38 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6">
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <button onClick={() => setDiscoveryMode('popular')} className={`py-3 rounded-xl font-semibold text-sm transition-colors ${discoveryMode === 'popular' ? 'bg-rose-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200'}`}>✨ Popular people</button>
+        <button onClick={() => { setDiscoveryMode('cards'); setCurrentIdx(0); }} className={`py-3 rounded-xl font-semibold text-sm transition-colors ${discoveryMode === 'cards' ? 'bg-rose-500 text-white shadow' : 'bg-white text-gray-600 border border-gray-200'}`}>Swipe discovery</button>
+      </div>
+      {discoveryMode === 'popular' && (
+        <section className="mb-5">
+          <div className="mb-3">
+            <h2 className="text-xl font-bold text-gray-900">Popular people</h2>
+            <p className="text-sm text-gray-500">Browse more profiles. People who are online appear first. Like someone to show interest; chat becomes available when you match.</p>
+          </div>
+          {popularProfiles.length === 0 ? (
+            <div className="rounded-2xl bg-white border border-gray-100 p-6 text-center text-gray-500">No profiles match these filters yet. Try changing the city or age filter, or refresh.</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {popularProfiles.map((person) => (
+                <button key={person.id} onClick={() => { const index = visibleProfiles.findIndex((p) => p.id === person.id); setCurrentIdx(index); setDiscoveryMode('cards'); }} className="text-left overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="relative aspect-[4/5] bg-rose-50">
+                    {person.photo_url ? <img src={person.photo_url} alt={person.display_name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Heart className="w-12 h-12 text-rose-300" /></div>}
+                    <span className={`absolute top-2 left-2 rounded-full px-2 py-1 text-[10px] font-semibold ${person.online ? 'bg-green-500 text-white' : 'bg-black/50 text-white'}`}>{person.online ? '● Online' : 'Offline'}</span>
+                  </div>
+                  <div className="p-3">
+                    <div className="font-semibold text-gray-900 truncate">{person.display_name}{person.age ? `, ${person.age}` : ''}</div>
+                    <div className="text-xs text-gray-500 truncate">{person.city || 'Location not set'}</div>
+                    <div className="mt-2 text-xs font-semibold text-rose-600">View and like profile →</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      {discoveryMode === 'cards' && (
       <div className="mb-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
         <div className="flex items-center justify-between mb-3">
           <div><div className="font-semibold text-gray-900">Discovery filters</div><div className="text-xs text-gray-500">Matches respect your profile preferences</div></div>
@@ -213,7 +247,7 @@ export default function DiscoverPage() {
           </label>
         </div>
       </div>
-      {matchedProfile && (
+      {discoveryMode === 'cards' && matchedProfile && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-white rounded-3xl p-7 text-center shadow-2xl">
             <div className="mx-auto w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mb-4">
@@ -233,7 +267,7 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      <div className="relative rounded-3xl overflow-hidden shadow-2xl bg-white">
+      {discoveryMode === 'cards' && current && <><div className="relative rounded-3xl overflow-hidden shadow-2xl bg-white">
         <div className="aspect-[3/4] relative bg-gradient-to-br from-rose-100 to-pink-100">
           {current.photo_url ? (
             <img
@@ -304,7 +338,8 @@ export default function DiscoverPage() {
 
       <p className="text-center text-sm text-gray-400 mt-4">
         {Math.max(0, visibleProfiles.length - currentIdx - 1)} more profiles to discover
-      </p>
+      </p></>}
+      )}
     </div>
   );
 }
