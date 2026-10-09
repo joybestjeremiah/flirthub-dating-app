@@ -151,6 +151,16 @@ export default function DiscoverPage() {
     setDirectChatLoading(false);
   };
 
+  useEffect(() => {
+    if (!directChatId) return;
+    const channel = supabase.channel(`direct-messages:${directChatId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `conversation_id=eq.${directChatId}` }, (payload) => {
+        const incoming = payload.new as {id:string;sender:string;content:string;created_at:string};
+        setDirectMessages((items) => items.some((item) => item.id === incoming.id) ? items : [...items, incoming]);
+      }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [directChatId]);
+
   const sendDirectMessage = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user || !directChatId || !directMessageText.trim() || !hasActiveSubscription) return;
