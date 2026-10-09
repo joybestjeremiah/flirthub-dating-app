@@ -30,8 +30,33 @@ function App() {
   const route = useRoute(); const [showSubModal, setShowSubModal] = useState(false); const [showWalletModal, setShowWalletModal] = useState(false); const [showWalletHistory, setShowWalletHistory] = useState(false); const [showGiftCenter, setShowGiftCenter] = useState(false); const [showProfile, setShowProfile] = useState(false); const [showNotifications, setShowNotifications] = useState(false); const [notifications, setNotifications] = useState<Notification[]>([]); const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const loadNotifications = async () => { if (!user) return; const { data } = await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30); setNotifications((data ?? []) as Notification[]); };
   useEffect(() => { if (!user) return; void loadNotifications(); const timer = window.setInterval(() => void loadNotifications(), 15000); return () => window.clearInterval(timer); }, [user?.id]);
-  useEffect(() => { const ref = new URLSearchParams(window.location.search).get('ref'); if (ref) sessionStorage.setItem('flirthub_referral_code', ref); }, []);
-  useEffect(() => { if (!user) return; const ref = sessionStorage.getItem('flirthub_referral_code'); if (!ref) return; void supabase.rpc('claim_referral', { p_code: ref }).then(({ error }) => { if (!error) sessionStorage.removeItem('flirthub_referral_code'); }); }, [user?.id]);
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref')?.trim();
+    if (ref) {
+      localStorage.setItem('flirthub_referral_code', ref);
+      sessionStorage.setItem('flirthub_referral_code', ref);
+    }
+  }, []);
+  useEffect(() => {
+    if (!user) return;
+    const ref = localStorage.getItem('flirthub_referral_code') || sessionStorage.getItem('flirthub_referral_code') || user.user_metadata?.referral_code;
+    if (!ref) return;
+    let cancelled = false;
+    void supabase.rpc('claim_referral', { p_code: ref }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error('Referral claim failed:', error.message);
+        return;
+      }
+      if (data === true) {
+        localStorage.removeItem('flirthub_referral_code');
+        sessionStorage.removeItem('flirthub_referral_code');
+      } else {
+        console.info('Referral was not claimed. The code may be invalid, self-referred, or the account may already have a referrer.');
+      }
+    }).catch((error) => console.error('Referral claim failed:', error));
+    return () => { cancelled = true; };
+  }, [user?.id]);
   const unreadCount = notifications.filter((n) => !n.read_at).length;
   const markNotificationRead = async (id: string) => { const now = new Date().toISOString(); await supabase.from('notifications').update({ read_at: now }).eq('id', id); setNotifications((items) => items.map((n) => n.id === id ? { ...n, read_at: now } : n)); };
   const markAllNotificationsRead = async () => { if (!user || unreadCount === 0) return; const now = new Date().toISOString(); await supabase.from('notifications').update({ read_at: now }).eq('user_id', user.id).is('read_at', null); setNotifications((items) => items.map((n) => ({ ...n, read_at: n.read_at ?? now })) ); };
