@@ -48,7 +48,7 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
           <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white"><X className="w-6 h-6" /></button>
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/20 backdrop-blur mb-3"><Crown className="w-7 h-7 text-white" /></div>
           <h2 className="text-2xl font-bold text-white">Go Premium</h2>
-          <p className="text-white/80 text-sm mt-1">Unlock chat, calls & private rooms</p>
+          <p className="text-white/80 text-sm mt-1">Unlock chat, video calls & private rooms</p>
         </div>
         <div className="p-6">
           {reason && <div className="mb-4 text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-3 text-center font-medium">{reason}</div>}
