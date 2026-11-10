@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Subscription } from '@/lib/types';
@@ -31,12 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (uid: string) => {
+  const loadProfile = useCallback(async (uid: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
     setProfile(data as Profile | null);
-  };
+  }, []);
 
-  const loadSubscription = async (uid: string) => {
+  const loadSubscription = useCallback(async (uid: string) => {
     const now = new Date().toISOString();
     const { data: active } = await supabase
       .from('subscriptions')
@@ -59,10 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .limit(1)
       .maybeSingle();
     setSubscription(latest as Subscription | null);
-  };
+  }, []);
 
-  const refreshProfile = async () => { if (user) await loadProfile(user.id); };
-  const refreshSubscription = async () => { if (user) await loadSubscription(user.id); };
+  const refreshProfile = useCallback(async () => { if (user) await loadProfile(user.id); }, [user?.id, loadProfile]);
+  const refreshSubscription = useCallback(async () => { if (user) await loadSubscription(user.id); }, [user?.id, loadSubscription]);
 
   useEffect(() => {
     let heartbeat: ReturnType<typeof setInterval> | null = null;
