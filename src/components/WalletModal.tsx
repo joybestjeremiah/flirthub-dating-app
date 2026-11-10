@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Wallet, X, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 interface WalletModalProps { onClose: () => void; }
 
 export default function WalletModal({ onClose }: WalletModalProps) {
+  const { user } = useAuth();
   const [balance, setBalance] = useState(0);
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -12,12 +14,17 @@ export default function WalletModal({ onClose }: WalletModalProps) {
   const [success, setSuccess] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase.from('wallets').select('balance').maybeSingle();
+    if (!user) { setBalance(0); return; }
+    const { data, error } = await supabase.from('wallets').select('balance').eq('user_id', user.id).maybeSingle();
+    if (error) {
+      setMessage('Could not load your wallet balance. Please refresh and try again.');
+      return;
+    }
     setBalance(Number(data?.balance ?? 0));
   };
 
   useEffect(() => {
-    load();
+    void load();
     const params = new URLSearchParams(window.location.search);
     const txRef = params.get('tx_ref');
     const reference = params.get('reference') || txRef;
@@ -36,7 +43,7 @@ export default function WalletModal({ onClose }: WalletModalProps) {
         .catch((e) => setMessage(e instanceof Error ? e.message : 'Payment verification failed.'))
         .finally(() => setLoading(false));
     }
-  }, []);
+  }, [user?.id]);
 
   const fund = async () => {
     setMessage('');

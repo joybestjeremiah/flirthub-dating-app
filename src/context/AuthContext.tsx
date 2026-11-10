@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Subscription } from '@/lib/types';
@@ -31,12 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (uid: string) => {
+  const loadProfile = useCallback(async (uid: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
     setProfile(data as Profile | null);
-  };
+  }, []);
 
-  const loadSubscription = async (uid: string) => {
+  const loadSubscription = useCallback(async (uid: string) => {
     const now = new Date().toISOString();
     const { data: active } = await supabase
       .from('subscriptions')
@@ -59,16 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .limit(1)
       .maybeSingle();
     setSubscription(latest as Subscription | null);
-  };
+  }, []);
 
-  const setPresence = async (uid: string, online: boolean) => {
-    if (uid !== user?.id && online) return;
-    const { error } = await supabase.rpc('set_my_presence', { p_online: online });
-    if (error) console.warn('Presence update failed:', error.message);
-  };
-
-  const refreshProfile = async () => { if (user) await loadProfile(user.id); };
-  const refreshSubscription = async () => { if (user) await loadSubscription(user.id); };
+  const refreshProfile = useCallback(async () => { if (user) await loadProfile(user.id); }, [user?.id, loadProfile]);
+  const refreshSubscription = useCallback(async () => { if (user) await loadSubscription(user.id); }, [user?.id, loadSubscription]);
 
   useEffect(() => {
     let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -150,7 +144,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deleteAccount = async () => { const { data: { session: currentSession } } = await supabase.auth.getSession(); if (!currentSession) return { error: 'You are not signed in.' }; const { error } = await supabase.functions.invoke('delete-account', { headers: { Authorization: `Bearer ${currentSession.access_token}` } }); if (error) return { error: error.message }; await supabase.auth.signOut({ scope: 'local' }); setProfile(null); setSubscription(null); return { error: null }; };
   const signOut = async () => { await supabase.rpc('set_my_presence', { p_online: false }); await supabase.auth.signOut(); setProfile(null); setSubscription(null); };
 
-  const hasActiveSubscription = !!subscription && subscription.status === 'active' && new Date(subscription.expires_at) > new Date();
+  // A null expiry is an explicitly non-expiring active subscription.
+  const hasActiveSubscription = !!subscription && subscription.status === 'active' &&
+    (subscription.expires_at == null || new Date(subscription.expires_at).getTime() > Date.now());
   const isAdmin = !!profile?.is_admin;
 
   return <AuthContext.Provider value={{ session, user, profile, subscription, hasActiveSubscription, isAdmin, loading, signUp, signIn, resetPassword, resendVerification, updatePassword, deleteAccount, signOut, refreshProfile, refreshSubscription }}>{children}</AuthContext.Provider>;

@@ -54,7 +54,7 @@ export default function SubscriptionModal({ onClose, reason }: Props) {
           {reason && <div className="mb-4 text-sm text-rose-600 bg-rose-50 rounded-xl px-4 py-3 text-center font-medium">{reason}</div>}
           <div className="space-y-3 mb-5">
             <div className="flex items-center gap-2 text-sm text-gray-600"><Sparkles className="w-4 h-4 text-rose-500" />Unlimited chat messaging</div>
-            <div className="flex items-center gap-2 text-sm text-gray-600"><Sparkles className="w-4 h-4 text-rose-500" />Audio & video calls</div>
+            <div className="flex items-center gap-2 text-sm text-gray-600"><Sparkles className="w-4 h-4 text-rose-500" />Video calls</div>
             <div className="flex items-center gap-2 text-sm text-gray-600"><Sparkles className="w-4 h-4 text-rose-500" />Create & join private rooms</div>
           </div>
           <div className="space-y-3 mb-5">
