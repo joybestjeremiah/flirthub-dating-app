@@ -63,6 +63,40 @@ function App() {
   useEffect(() => { if (route === '/discover') setShowProfile(false); }, [route]);
   useEffect(() => { if (loading) return; if (!user) { if (route !== '/' && route !== '/reset-password' && route !== '/terms') navigate('/'); return; } if (!profile) { if (route !== '/profile-setup' && route !== '/reset-password' && route !== '/terms') navigate('/profile-setup'); return; } if (!profile.photo_url && route !== '/profile-setup' && route !== '/reset-password' && route !== '/terms') navigate('/profile-setup'); if (route === '/' || route === '/profile-setup') { if (profile.photo_url) navigate('/discover'); } if (route === '/admin' && !isAdmin) navigate('/discover'); }, [loading, user, profile, isAdmin, route]);
   useEffect(() => { const params = new URLSearchParams(window.location.search); if (params.get('payment') !== 'subscription') return; const status = params.get('status'); const transactionId = params.get('transaction_id'); const reference = params.get('reference'); const txRef = params.get('tx_ref') || reference || sessionStorage.getItem('flirthub_subscription_tx_ref'); if (status === 'cancelled' || status === 'failed') { setPaymentMessage('Payment was not completed. Your Premium access was not activated.'); sessionStorage.removeItem('flirthub_subscription_tx_ref'); return; } if (!txRef) { setPaymentMessage('Payment returned without a valid transaction reference.'); return; } let cancelled = false; (async () => { const { data, error } = await supabase.functions.invoke('verify-subscription-payment', { body: { tx_ref: txRef, transaction_id: transactionId || undefined, reference: txRef } }); if (cancelled) return; if (error || !data?.success) { setPaymentMessage(data?.error || error?.message || 'Payment verification failed. Premium was not activated.'); return; } sessionStorage.removeItem('flirthub_subscription_tx_ref'); await refreshSubscription(); if (!cancelled) setPaymentMessage('Payment verified successfully. Premium is now active.'); })(); return () => { cancelled = true; }; }, [refreshSubscription]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') !== 'wallet' || !user) return;
+
+    const status = params.get('status');
+    if (status === 'cancelled' || status === 'failed') {
+      setPaymentMessage('Wallet payment was not completed. Your balance was not changed.');
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    const reference = params.get('reference') || params.get('trxref') || params.get('tx_ref');
+    if (!reference) {
+      setPaymentMessage('Wallet payment returned without a transaction reference. Please contact support before trying again.');
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase.functions.invoke('verify-wallet-topup', {
+        body: { reference, transaction_id: params.get('transaction_id') || undefined },
+      });
+      if (cancelled) return;
+      if (error || !data?.success) {
+        setPaymentMessage(data?.error || error?.message || 'Wallet payment verification failed. Your balance has not been confirmed.');
+        return;
+      }
+      window.history.replaceState({}, '', window.location.pathname);
+      setShowWalletModal(true);
+      setPaymentMessage('Wallet payment verified successfully. Your balance has been updated.');
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id]);
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50"><Loader2 className="w-10 h-10 text-rose-500 animate-spin" /></div>;
   if (route === '/terms') return <TermsPage onBack={() => navigate(user ? '/discover' : '/')} />;
   if (!user && route !== '/reset-password') return <AuthPage />; if (route === '/reset-password') return <PasswordResetPage />; if (!profile || !profile.photo_url) return <ProfileSetup />; if (route === '/referrals') return <ReferralPage onBack={() => navigate('/discover')} />; if (showProfile) return <div><ProfileSetup /><div className="max-w-lg mx-auto px-4 pb-10 space-y-3"><ContactAdmin /><button onClick={() => navigate('/referrals')} className="w-full rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-4 text-left"><div className="flex items-center gap-3"><UserPlus className="w-5 h-5 text-rose-600" /><div><div className="font-semibold text-gray-900">Invite friends</div><div className="text-xs text-gray-500 mt-1">Share your referral link and track invitations</div></div></div></button><button onClick={() => navigate('/terms')} className="w-full rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-4 text-left"><div><div className="font-semibold text-gray-900">Terms & Conditions</div><div className="text-xs text-gray-500 mt-1">Community rules, safety and account sanctions</div></div></button></div></div>; if (route === '/admin') return <AdminPanelWithSanctions onBack={() => navigate('/discover')} />; if (route === '/subscription') return <SubscriptionPage />; if (route === '/earnings') return <HostEarningsPage onBack={() => navigate('/discover')} />;
