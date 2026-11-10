@@ -62,7 +62,44 @@ function App() {
   const markAllNotificationsRead = async () => { if (!user || unreadCount === 0) return; const now = new Date().toISOString(); await supabase.from('notifications').update({ read_at: now }).eq('user_id', user.id).is('read_at', null); setNotifications((items) => items.map((n) => ({ ...n, read_at: n.read_at ?? now })) ); };
   useEffect(() => { if (route === '/discover') setShowProfile(false); }, [route]);
   useEffect(() => { if (loading) return; if (!user) { if (route !== '/' && route !== '/reset-password' && route !== '/terms') navigate('/'); return; } if (!profile) { if (route !== '/profile-setup' && route !== '/reset-password' && route !== '/terms') navigate('/profile-setup'); return; } if (!profile.photo_url && route !== '/profile-setup' && route !== '/reset-password' && route !== '/terms') navigate('/profile-setup'); if (route === '/' || route === '/profile-setup') { if (profile.photo_url) navigate('/discover'); } if (route === '/admin' && !isAdmin) navigate('/discover'); }, [loading, user, profile, isAdmin, route]);
-  useEffect(() => { const params = new URLSearchParams(window.location.search); if (params.get('payment') !== 'subscription') return; const status = params.get('status'); const transactionId = params.get('transaction_id'); const reference = params.get('reference'); const txRef = params.get('tx_ref') || reference || sessionStorage.getItem('flirthub_subscription_tx_ref'); if (status === 'cancelled' || status === 'failed') { setPaymentMessage('Payment was not completed. Your Premium access was not activated.'); sessionStorage.removeItem('flirthub_subscription_tx_ref'); return; } if (!txRef) { setPaymentMessage('Payment returned without a valid transaction reference.'); return; } let cancelled = false; (async () => { const { data, error } = await supabase.functions.invoke('verify-subscription-payment', { body: { tx_ref: txRef, transaction_id: transactionId || undefined, reference: txRef } }); if (cancelled) return; if (error || !data?.success) { setPaymentMessage(data?.error || error?.message || 'Payment verification failed. Premium was not activated.'); return; } sessionStorage.removeItem('flirthub_subscription_tx_ref'); await refreshSubscription(); if (!cancelled) setPaymentMessage('Payment verified successfully. Premium is now active.'); })(); return () => { cancelled = true; }; }, [refreshSubscription]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') !== 'subscription' || !user) return;
+
+    const status = params.get('status');
+    const transactionId = params.get('transaction_id');
+    const reference = params.get('reference');
+    const txRef = params.get('tx_ref') || reference || sessionStorage.getItem('flirthub_subscription_tx_ref');
+
+    if (status === 'cancelled' || status === 'failed') {
+      setPaymentMessage('Payment was not completed. Your Premium access was not activated.');
+      sessionStorage.removeItem('flirthub_subscription_tx_ref');
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    if (!txRef) {
+      setPaymentMessage('Payment returned without a valid transaction reference.');
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.functions.invoke('verify-subscription-payment', {
+        body: { tx_ref: txRef, transaction_id: transactionId || undefined, reference: txRef },
+      });
+      if (cancelled) return;
+      if (error || !data?.success) {
+        setPaymentMessage(data?.error || error?.message || 'Payment verification failed. Premium was not activated.');
+        return;
+      }
+      sessionStorage.removeItem('flirthub_subscription_tx_ref');
+      window.history.replaceState({}, '', window.location.pathname);
+      await refreshSubscription();
+      if (!cancelled) setPaymentMessage('Payment verified successfully. Premium is now active.');
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id, refreshSubscription]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') !== 'wallet' || !user) return;
