@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Heart, X, MapPin, Loader2, Search, Sparkles, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -28,12 +28,8 @@ export default function DiscoverPage() {
   const [directChatLoading, setDirectChatLoading] = useState(false);
   const [directChatError, setDirectChatError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadProfiles();
-  }, []);
-
-  const loadProfiles = async () => {
-    if (!user) return;
+  const loadProfiles = useCallback(async () => {
+    if (!user) { setProfiles([]); setLoading(false); return; }
     setLoading(true);
 
     const [
@@ -62,7 +58,8 @@ export default function DiscoverPage() {
     const { data: meData } = await supabase.from('profiles').select('gender, interested_in, latitude, longitude, max_distance_km').eq('id', user.id).maybeSingle();
     const me = meData as Pick<Profile, 'gender' | 'interested_in'> & { latitude?: number | null; longitude?: number | null; max_distance_km?: number } | null;
     setMaxDistanceKm(me?.max_distance_km ?? 50);
-    setLocationEnabled(me?.latitude != null && me?.longitude != null);
+    const hasLocation = me?.latitude != null && me?.longitude != null;
+    setLocationEnabled(hasLocation);
     let distanceById = new Map<string, number>();
     if (me?.latitude != null && me?.longitude != null) {
       const { data: nearby } = await supabase.rpc('nearby_profiles', { p_latitude: me.latitude, p_longitude: me.longitude, p_max_distance_km: me.max_distance_km ?? 50 });
@@ -75,9 +72,11 @@ export default function DiscoverPage() {
       return genderMatches && candidateAcceptsMe && !likedSet.has(candidate.id) && !passedSet.has(candidate.id) && !blockedSet.has(candidate.id);
     }) as Profile[];
     setProfiles(filtered.map((p) => ({ ...p, distance_km: distanceById.get(p.id) } as Profile & { distance_km?: number })));
-    setLocationMessage(locationEnabled ? null : 'Enable location in your profile to match by distance. City matching remains available.');
+    setLocationMessage(hasLocation ? null : 'Enable location in your profile to match by distance. City matching remains available.');
     setLoading(false);
-  };
+  }, [user?.id]);
+
+  useEffect(() => { void loadProfiles(); }, [loadProfiles]);
 
   const handleLike = async () => {
     if (!user || actionLoading) return;
